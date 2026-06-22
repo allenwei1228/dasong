@@ -58,21 +58,19 @@ class SettlementEngine {
         }
 
         // Calculate bonuses from player's shops
-        val menuBonuses = player.foundations.filter { it.hasModel && it.shopCard != null }
+        // 酒肆: +1 coin per card drawn (not +1 menu count)
+        val menuBonuses = player.foundations.filter { it.hasModel && it.shopCard != null && it.isBuilt }
         val jiuSiCount = menuBonuses.count { it.shopCard?.type == ShopType.JIU_SI }
         val cuJuCount = menuBonuses.count { it.shopCard?.type == ShopType.CU_JU }
 
-        val bonusFromJiuSi = jiuSiCount * 1 // +1 per 酒肆
-        val bonusFromCuJu = cuJuCount * 2 // +2 per 蹴鞠场
-        val totalBonus = bonusFromJiuSi + bonusFromCuJu
-
-        // Check if guest visits these shops
+        // 蹴鞠场: +2 menu count per 蹴鞠场
+        val bonusFromCuJu = cuJuCount * 2
         val guestShops = guest.shopTypes
-        val effectiveBonus = if (guestShops.any { it == ShopType.JIU_SI || it == ShopType.CU_JU }) {
-            totalBonus
-        } else 0
+        val effectiveCuJuBonus = if (guestShops.any { it == ShopType.CU_JU }) bonusFromCuJu else 0
+        menuCount += effectiveCuJuBonus
 
-        menuCount += effectiveBonus
+        // 酒肆: +1 coin per card, calculated later in card loop
+        val jiuSiBonusPerCard = if (guestShops.any { it == ShopType.JIU_SI }) jiuSiCount * 1 else 0
 
         // Draw cards from refined chamber
         val drawnCards = mutableListOf<MenuCard>()
@@ -97,6 +95,9 @@ class SettlementEngine {
         drawnCards.forEach { card ->
             var cardIncome = card.baseIncome
 
+            // 酒肆 bonus: +1 coin per 酒肆 on each card
+            cardIncome += jiuSiBonusPerCard
+
             // 一品: add dice roll
             if (card.grade == MenuGrade.ONE) {
                 val diceValue = diceRoller()
@@ -114,7 +115,7 @@ class SettlementEngine {
             cardsDrawn = drawnCards,
             totalIncome = totalIncome,
             diceResults = diceResults,
-            menuCountBonus = effectiveBonus
+            menuCountBonus = effectiveCuJuBonus + jiuSiBonusPerCard
         )
     }
 
@@ -124,19 +125,24 @@ class SettlementEngine {
     fun calculateShopIncome(
         player: PlayerState,
         guest: GuestCard,
-        event: EventCard?
+        event: EventCard?,
+        selectedShopIndex: Int? = null  // 门可罗雀时玩家选择的店铺foundation index
     ): ShopSettlementResult {
         val guestShopTypes = guest.shopTypes
-        val builtShops = player.foundations.filter { it.hasModel && it.shopCard != null }
+        val builtShops = player.foundations.filter { it.hasModel && it.shopCard != null && it.isBuilt }
 
         // Shops that the guest visits
         val visitedShops = builtShops.filter { it.shopCard!!.type in guestShopTypes }
         val activations = mutableListOf<ShopActivation>()
         val linkageDetails = mutableListOf<LinkageDetail>()
 
-        // Apply event: 门可罗雀 - only 1 shop
+        // Apply event: 门可罗雀 - only 1 shop chosen by player
         val effectiveVisitedShops = if (event?.effect == EventEffect.MEN_KE_LUO_QUE && visitedShops.isNotEmpty()) {
-            listOf(visitedShops.first())
+            if (selectedShopIndex != null) {
+                visitedShops.filter { it.index == selectedShopIndex }.ifEmpty { listOf(visitedShops.first()) }
+            } else {
+                listOf(visitedShops.first())
+            }
         } else {
             visitedShops
         }

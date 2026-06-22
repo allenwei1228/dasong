@@ -54,8 +54,8 @@ fun FoundationSlotView(
             .size(68.dp)
             .background(
                 when {
-                    foundation.hasModel -> FoundationBuilt
-                    foundation.shopCard != null -> FoundationOccupied
+                    foundation.isBuilt -> FoundationBuilt  // 房屋已购买，效果生效
+                    foundation.shopCard != null -> FoundationOccupied  // 店铺牌已放置但房屋未购买
                     else -> FoundationEmpty
                 },
                 RoundedCornerShape(8.dp)
@@ -72,7 +72,7 @@ fun FoundationSlotView(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
-                if (foundation.hasModel) {
+                if (foundation.isBuilt) {
                     Icon(
                         Icons.Default.Home,
                         contentDescription = "已建",

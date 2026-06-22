@@ -6,17 +6,18 @@ import com.dasong.commerce.model.card.ShopCard
 data class Foundation(
     val index: Int,
     var shopCard: ShopCard? = null,
-    var hasModel: Boolean = false
+    var hasModel: Boolean = false,
+    var isBuilt: Boolean = false  // 店铺房屋是否已购买（购买后效果才生效）
 ) {
     val clearCost: Int get() = when (index) {
         0 -> 0
         1 -> 2
         2 -> 3
-        3 -> 4
-        4 -> 5
-        5 -> 6
-        6 -> 7
-        7 -> 9
+        3 -> 6
+        4 -> 7
+        5 -> 8
+        6 -> 9
+        7 -> 10
         else -> throw IllegalArgumentException("最多8块地基")
     }
 }

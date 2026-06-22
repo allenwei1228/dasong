@@ -39,7 +39,7 @@ fun GameInfoPopup(
                             }
                             Text("🏠 已建店铺:")
                             val builtShops = player.foundations
-                                .filter { it.hasModel && it.shopCard != null }
+                                .filter { it.hasModel && it.shopCard != null && it.isBuilt }
                                 .groupBy { it.shopCard!!.type }
                                 .mapValues { it.value.size }
 
@@ -50,8 +50,12 @@ fun GameInfoPopup(
                                     Text("  · ${type.displayName}: ${count}间")
                                 }
                             }
+                            val placedCount = player.foundations.count { it.hasModel && !it.isBuilt }
+                            if (placedCount > 0) {
+                                Text("  + ${placedCount}间待建房", color = Color.Gray)
+                            }
                             Text(
-                                "  总模型数: ${player.foundations.count { it.hasModel }}/8",
+                                "  总模型数: ${player.foundations.count { it.hasModel && it.isBuilt }}/8",
                                 fontWeight = FontWeight.SemiBold
                             )
                         }

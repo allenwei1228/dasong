@@ -10,6 +10,7 @@ class EventExecutor {
         event: EventCard,
         players: List<PlayerState>,
         guestQueue: MutableList<GuestCard>,
+        guestDeck: MutableList<GuestCard>,
         menuPool: MenuPool
     ) {
         when (event.effect) {
@@ -26,11 +27,15 @@ class EventExecutor {
                 // Menu consumption +1 (handled in settlement)
             }
             EventEffect.ZHANG_DENG_JIE_CAI -> {
-                // Queue expanded to 6 - just add more guests
-                while (guestQueue.size < 6) {
-                    guestQueue.add(
-                        GuestCard(999, "临时客人", 2, listOf(ShopType.YIN_ZI))
-                    )
+                // 增加到6人：从Guest牌堆中抽牌填满到6人
+                while (guestQueue.size < 6 && guestDeck.isNotEmpty()) {
+                    guestQueue.add(guestDeck.removeAt(0))
+                }
+                // 再从Guest牌堆中翻开2个人
+                repeat(2) {
+                    if (guestDeck.isNotEmpty()) {
+                        guestQueue.add(guestDeck.removeAt(0))
+                    }
                 }
             }
             EventEffect.YIN_ZHUANG_SU_GUO -> {
@@ -46,9 +51,9 @@ class EventExecutor {
                 guestQueue.clear()
             }
             EventEffect.KE_JUAN_ZA_SHUI -> {
-                // Each model pays 2 coins
+                // Each built shop pays 2 coins
                 players.forEach { player ->
-                    val modelCount = player.foundations.count { it.hasModel }
+                    val modelCount = player.foundations.count { it.hasModel && it.isBuilt }
                     val tax = modelCount * 2
                     player.funds = (player.funds - tax).coerceAtLeast(0)
                 }

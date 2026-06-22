@@ -3,6 +3,7 @@ package com.dasong.commerce.ui.game.components.phase
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,9 +55,10 @@ fun ServePhasePanel(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "${guest.name} (位${position})",
                                 fontWeight = FontWeight.Bold
@@ -67,10 +69,18 @@ fun ServePhasePanel(
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                if (cost > 0) "小费: ${cost}两" else "免费招待",
+                                if (cost > 0) "跳过前面${cost}人 · 支付${cost}两" else "首位 · 免费招待",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
+                            // 显示客人身上积累的小费（被跳过时前面的人给他加的）
+                            if (guest.tip > 0) {
+                                Text(
+                                    "积累小费: ${guest.tip}两（招待后归你）",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                         Button(
                             onClick = { onSelectGuest(position) },

@@ -35,6 +35,8 @@ class TurnManager {
         state.settlementTip = 0
         state.settlementMenuIncome = 0
         state.settlementShopIncome = 0
+        state.menuBoughtThisTurn = false // 重置菜单购买标记
+        state.shopPlacedThisTurn = false // 重置店铺放置标记
         Log.d(TAG, "玩家切换: $prevPlayer -> ${state.currentPlayer.name} | 阶段重置: $prevPhase -> BUY")
     }
 }

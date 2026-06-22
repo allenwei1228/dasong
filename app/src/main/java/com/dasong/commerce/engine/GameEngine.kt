@@ -74,37 +74,75 @@ class GameEngine(
         val state = requireState()
         val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
         require(state.currentPhase == GamePhase.BUY) { "当前不是购买阶段" }
+        require(!state.shopPlacedThisTurn) { "本回合已放置店铺牌，不可再购买菜单牌" }
+        require(!state.menuBoughtThisTurn) { "本回合已购买过菜单牌，每回合只能购买一张" }
         require(player.funds >= card.cost) { "资金不足" }
 
         player.funds -= card.cost
         player.kitchen.add(card)
+        state.menuBoughtThisTurn = true
 
         // Remove from menu pool
         state.menuPool.getPile(card.grade).remove(card)
+
+        // 如果无可建造的房屋，自动跳过建房步骤
+        val hasUnbuiltShops = player.foundations.any { it.shopCard != null && !it.isBuilt }
+        if (!hasUnbuiltShops) {
+            turnManager.advanceToNextPhase(state)
+        }
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
     }
 
-    fun buyShopCard(playerId: Int, shop: ShopCard, foundationIndex: Int) {
+    // Step 1: 放置店铺牌（只支付清理地基费用，一回合一次，店铺效果不生效）
+    fun placeShopCard(playerId: Int, shop: ShopCard, foundationIndex: Int) {
         val state = requireState()
         val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
         require(state.currentPhase == GamePhase.BUY) { "当前不是购买阶段" }
+        require(!state.menuBoughtThisTurn) { "本回合已购买菜单牌，不可再放置店铺牌" }
+        require(!state.shopPlacedThisTurn) { "本回合已放置过店铺牌，每回合只能放置一次" }
 
         val foundation = player.foundations[foundationIndex]
         require(foundation.shopCard == null) { "该地基已被占用" }
 
         val clearCost = foundation.clearCost
-        val totalCost = clearCost + shop.buildCost
-        require(player.funds >= totalCost) { "资金不足：需要${totalCost}两（清理${clearCost}两 + 建造${shop.buildCost}两）" }
+        require(player.funds >= clearCost) { "资金不足：清理地基需要${clearCost}两" }
 
-        player.funds -= totalCost
+        player.funds -= clearCost
         foundation.shopCard = shop
         foundation.hasModel = true
+        foundation.isBuilt = false // 店铺效果不生效
+
+        state.shopPlacedThisTurn = true
 
         // Remove from shop pool and replenish
         state.shopPool.available.remove(shop)
         val newShop = deckManager.drawShopFromPool(state.shopPool)
         if (newShop != null) {
             state.shopPool.available.add(newShop)
+        }
+        _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
+    }
+
+    // Step 2: 购买店铺房屋（支付店铺价格，不限次数，购买后效果生效）
+    fun buildShopHouse(playerId: Int, foundationIndex: Int) {
+        val state = requireState()
+        val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
+        require(state.currentPhase == GamePhase.BUY) { "当前不是购买阶段" }
+
+        val foundation = player.foundations[foundationIndex]
+        require(foundation.shopCard != null) { "该地基没有放置店铺牌" }
+        require(!foundation.isBuilt) { "该店铺房屋已购买" }
+
+        val buildCost = foundation.shopCard!!.buildCost
+        require(player.funds >= buildCost) { "资金不足：购买房屋需要${buildCost}两" }
+
+        player.funds -= buildCost
+        foundation.isBuilt = true // 店铺效果生效
+
+        // 如果建造后无可再建造的房屋，自动跳过建房步骤进入下一阶段
+        val hasUnbuiltShops = player.foundations.any { it.shopCard != null && !it.isBuilt }
+        if (!hasUnbuiltShops) {
+            turnManager.advanceToNextPhase(state)
         }
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
     }
@@ -152,14 +190,26 @@ class GameEngine(
         val guestIndex = state.guestQueue.size - queuePosition
         require(guestIndex in state.guestQueue.indices) { "无效的客人位置" }
 
-        // Calculate tip (小费): position 1 free, others pay 1 per skip
-        val tip = (queuePosition - 1).coerceAtLeast(0)
-        require(player.funds >= tip) { "资金不足：小费需要${tip}两" }
+        // 小费逻辑：选第n位客人，支付n-1两，分配给第1~n-1位客人各+1
+        // 例：队列 [pos4, pos3, pos2, pos1]，选pos3 → 支付2两 → pos1和pos2各+1小费
+        val tipCost = (queuePosition - 1).coerceAtLeast(0)
+        require(player.funds >= tipCost) { "资金不足：小费需要${tipCost}两" }
 
-        player.funds -= tip
-        state.settlementTip = tip
+        player.funds -= tipCost
+
+        // 将小费分配给被跳过的客人（位置1~n-1，对应数组索引更大的元素）
+        for (i in (guestIndex + 1) until state.guestQueue.size) {
+            state.guestQueue[i].tip += 1
+        }
 
         val guest = state.guestQueue.removeAt(guestIndex)
+        // 选中客人身上已积累的小费（之前被跳过时积累的），归招待者所有
+        val accumulatedTip = guest.tip
+        state.settlementTip = accumulatedTip
+        guest.tip = 0
+        player.funds += accumulatedTip
+
+        state.selectedGuest = guest
         state.turnStep = TurnStep.PHASE_3_SETTLE_MENU
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
     }
@@ -167,10 +217,8 @@ class GameEngine(
     fun settleMenuIncome(playerId: Int): MenuSettlementResult {
         val state = requireState()
         val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
-        val guest = state.guestQueue.getOrNull(0) ?: error("未选择客人")
+        val guest = state.selectedGuest ?: error("未选择客人")
 
-        // TODO: Store selected guest reference
-        // For now, use the first guest in queue (simplified)
         val result = settlementEngine.calculateMenuIncome(
             player = player,
             guest = guest,
@@ -184,15 +232,16 @@ class GameEngine(
         return result
     }
 
-    fun settleShopIncome(playerId: Int): ShopSettlementResult {
+    fun settleShopIncome(playerId: Int, selectedShopIndex: Int? = null): ShopSettlementResult {
         val state = requireState()
         val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
-        val guest = state.guestQueue.getOrNull(0) ?: error("未选择客人")
+        val guest = state.selectedGuest ?: error("未选择客人")
 
         val result = settlementEngine.calculateShopIncome(
             player = player,
             guest = guest,
-            event = state.activeEvent
+            event = state.activeEvent,
+            selectedShopIndex = selectedShopIndex
         )
 
         state.settlementShopIncome = result.totalIncome
@@ -200,6 +249,16 @@ class GameEngine(
         state.turnStep = TurnStep.PHASE_3_REFRESH_GUEST
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
         return result
+    }
+
+    // 门可罗雀：获取可选的店铺列表
+    fun getMenKeLuoQueShops(playerId: Int): List<Foundation> {
+        val state = requireState()
+        val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
+        val guest = state.selectedGuest ?: return emptyList()
+
+        val builtShops = player.foundations.filter { it.hasModel && it.shopCard != null && it.isBuilt }
+        return builtShops.filter { it.shopCard!!.type in guest.shopTypes }
     }
 
     fun refreshGuestQueue() {
@@ -226,6 +285,8 @@ class GameEngine(
 
         if (winChecker.checkWin(player)) {
             // Winner!
+            state.winner = player.name
+            _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
             return
         }
 

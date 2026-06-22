@@ -16,6 +16,11 @@ data class GameState(
     var settlementTip: Int = 0,
     var settlementMenuIncome: Int = 0,
     var settlementShopIncome: Int = 0,
+    var selectedGuest: GuestCard? = null, // 当前正在结算的客人
+    var winner: String? = null, // 胜者名字
+    var menuBoughtThisTurn: Boolean = false, // 本回合是否已购买菜单牌
+    var shopPlacedThisTurn: Boolean = false, // 本回合是否已放置店铺牌
+    var pendingMenKeLuoQue: Boolean = false, // 门可罗雀：等待玩家选择店铺
     var stateVersion: Long = 0
 ) {
     val currentPlayer: PlayerState get() = players[currentPlayerIndex]

@@ -24,8 +24,11 @@ fun BuyPhasePanel(
     player: PlayerState,
     menuPool: MenuPool,
     shopPool: ShopPool,
+    menuBoughtThisTurn: Boolean = false,
+    shopPlacedThisTurn: Boolean = false,
     onBuyMenu: (MenuCard) -> Unit,
-    onBuyShop: (ShopCard, Int) -> Unit,
+    onPlaceShop: (ShopCard, Int) -> Unit,
+    onBuildHouse: (Int) -> Unit,
     onEndPhase: () -> Unit
 ) {
     var selectedMode by remember { mutableStateOf<String?>(null) } // "menu" or "shop"
@@ -48,21 +51,30 @@ fun BuyPhasePanel(
             )
             Spacer(Modifier.height(8.dp))
 
-            // Option A: Buy Menu
+            // Option A: Buy Menu (互斥：买菜单后不能再买店铺，反之亦然)
+            val canBuyMenu = !menuBoughtThisTurn && !shopPlacedThisTurn
             Button(
                 onClick = { selectedMode = "menu"; selectedFoundation = -1 },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = canBuyMenu,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedMode == "menu")
+                    containerColor = if (selectedMode == "menu" && canBuyMenu)
                         MaterialTheme.colorScheme.primary
                     else
                         MaterialTheme.colorScheme.surface
                 )
             ) {
-                Text("购买菜单牌", color = Color.Black)
+                Text(
+                    when {
+                        menuBoughtThisTurn -> "购买菜单牌 (本回合已购买)"
+                        shopPlacedThisTurn -> "购买菜单牌 (已放置店铺，不可购买)"
+                        else -> "购买菜单牌"
+                    },
+                    color = Color.Black
+                )
             }
 
-            if (selectedMode == "menu") {
+            if (selectedMode == "menu" && canBuyMenu) {
                 Spacer(Modifier.height(8.dp))
                 MenuGrade.entries.forEach { grade ->
                     val pile = menuPool.getPile(grade)
@@ -95,30 +107,39 @@ fun BuyPhasePanel(
 
             Spacer(Modifier.height(8.dp))
 
-            // Option B: Buy Shop
+            // Option B: Place Shop (互斥：放置店铺后不能再买菜单，反之亦然)
+            val canPlaceShop = !menuBoughtThisTurn && !shopPlacedThisTurn
             Button(
                 onClick = { selectedMode = "shop"; selectedFoundation = -1 },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = canPlaceShop,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedMode == "shop")
+                    containerColor = if (selectedMode == "shop" && canPlaceShop)
                         MaterialTheme.colorScheme.primary
                     else
                         MaterialTheme.colorScheme.surface
                 )
             ) {
-                Text("购买店铺牌", color = Color.Black)
+                Text(
+                    when {
+                        shopPlacedThisTurn -> "购买店铺牌 (本回合已放置)"
+                        menuBoughtThisTurn -> "购买店铺牌 (已购买菜单，不可放置)"
+                        else -> "购买店铺牌"
+                    },
+                    color = Color.Black
+                )
             }
 
-            if (selectedMode == "shop") {
+            if (selectedMode == "shop" && canPlaceShop) {
                 Spacer(Modifier.height(8.dp))
+                Text("第一步：放置店铺牌（仅支付清理地基费用，一回合一次）", fontWeight = FontWeight.Bold)
 
                 // Select foundation first - only show foundations without shops
                 val availableFoundations = player.foundations.filter { it.shopCard == null }
                 if (availableFoundations.isEmpty()) {
-                    Text("所有地基已建店铺，无法再购买", color = MaterialTheme.colorScheme.error)
+                    Text("所有地基已放置店铺", color = MaterialTheme.colorScheme.error)
                 } else {
                     Text("选择地基:", fontWeight = FontWeight.Bold)
-                    // Fix Bug 1: 使用 FlowRow 支持换行，展示所有地基
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -145,8 +166,8 @@ fun BuyPhasePanel(
                     Spacer(Modifier.height(8.dp))
                     Text("选择店铺:", fontWeight = FontWeight.Bold)
                     shopPool.available.forEach { shop ->
-                        val totalCost = player.foundations[selectedFoundation].clearCost + shop.buildCost
-                        val canAfford = player.funds >= totalCost
+                        val clearCost = player.foundations[selectedFoundation].clearCost
+                        val canAfford = player.funds >= clearCost
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -154,7 +175,6 @@ fun BuyPhasePanel(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Fix Bug 3 & 4: 店铺名蓝色可点击弹出效果弹窗，支持换行，不展示括号类型
                             Text(
                                 text = shop.name,
                                 color = Color.Blue,
@@ -166,27 +186,68 @@ fun BuyPhasePanel(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "总费用${totalCost}两",
+                                text = "清理费${clearCost}两 + 建房${shop.buildCost}两",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Button(
                                 onClick = {
-                                    // Fix Bug 2: 建造后重置 selectedFoundation，允许继续建造其他地基
-                                    onBuyShop(shop, selectedFoundation)
+                                    onPlaceShop(shop, selectedFoundation)
                                     selectedFoundation = -1
                                 },
                                 enabled = canAfford
                             ) {
-                                Text("建造")
+                                Text("放置")
                             }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+
+            // Option C: Build House (Step 2 - 支付店铺价格购买房屋，不限次数)
+            val placedUnbuiltShops = player.foundations.filter { it.shopCard != null && !it.isBuilt }
+            if (placedUnbuiltShops.isEmpty()) {
+                // 无可建造房屋时，若已购买过菜单或店铺，直接提示进入下一阶段
+                if (menuBoughtThisTurn || shopPlacedThisTurn) {
+                    Text("无可建造的房屋，请进入下一阶段", color = MaterialTheme.colorScheme.outline)
+                }
+            } else {
+                Text("购买店铺房屋（支付店铺价格，不限次数，购买后效果生效）", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                placedUnbuiltShops.forEach { foundation ->
+                    val shop = foundation.shopCard!!
+                    val canAfford = player.funds >= shop.buildCost
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${shop.name} (#${foundation.index + 1}号地)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "建房${shop.buildCost}两",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Button(
+                            onClick = { onBuildHouse(foundation.index) },
+                            enabled = canAfford
+                        ) {
+                            Text("建房")
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
 
             // Skip to next phase (Prepare Phase)
             Button(
@@ -201,7 +262,7 @@ fun BuyPhasePanel(
         }
     }
 
-    // Fix Bug 3: 店铺详情弹窗
+    // 店铺详情弹窗
     showShopDetail?.let { shop ->
         ShopDetailDialog(
             shop = shop,

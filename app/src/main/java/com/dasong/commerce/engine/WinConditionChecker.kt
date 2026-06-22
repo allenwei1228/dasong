@@ -5,7 +5,7 @@ import com.dasong.commerce.model.card.*
 
 class WinConditionChecker {
     fun checkWin(player: PlayerState): Boolean {
-        val shopsWithModel = player.foundations.count { it.hasModel && it.shopCard != null }
-        return shopsWithModel >= 8 && player.funds >= 50
+        val shopsBuilt = player.foundations.count { it.hasModel && it.shopCard != null && it.isBuilt }
+        return shopsBuilt >= 8 && player.funds >= 50
     }
 }

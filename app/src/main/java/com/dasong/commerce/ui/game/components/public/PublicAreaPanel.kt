@@ -33,11 +33,11 @@ fun PublicAreaPanel(state: GameState) {
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            MenuCardPool(state.menuPool)
+            GuestQueue(guestQueue = state.guestQueue)
             Spacer(Modifier.width(8.dp))
             ShopCardPool(shopPool = state.shopPool)
             Spacer(Modifier.width(8.dp))
-            GuestQueue(guestQueue = state.guestQueue)
+            MenuCardPool(state.menuPool)
         }
     }
 }

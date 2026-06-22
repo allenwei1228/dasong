@@ -7,7 +7,7 @@ data class MenuCard(
     val cost: Int
 ) {
     val baseIncome: Int get() = when (grade) {
-        MenuGrade.FOUR -> 2
+        MenuGrade.FOUR -> 1
         MenuGrade.THREE -> 2
         MenuGrade.TWO -> 3
         MenuGrade.ONE -> 2

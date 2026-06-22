@@ -45,12 +45,6 @@ fun ShopCardPool(shopPool: ShopPool) {
                         "建${shop.buildCost}两",
                         style = MaterialTheme.typography.labelSmall
                     )
-                    Text(
-                        shop.type.displayName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1
-                    )
                 }
             }
         }

@@ -3,8 +3,8 @@ package com.dasong.commerce.ui.game
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dasong.commerce.engine.*
-import com.dasong.commerce.model.card.MenuCard
-import com.dasong.commerce.model.card.ShopCard
+import com.dasong.commerce.model.*
+import com.dasong.commerce.model.card.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -26,6 +26,12 @@ class GameViewModel @Inject constructor(
     private val _winner = MutableStateFlow<String?>(null)
     val winner: StateFlow<String?> = _winner.asStateFlow()
 
+    private val _showMenKeLuoQueDialog = MutableStateFlow(false)
+    val showMenKeLuoQueDialog: StateFlow<Boolean> = _showMenKeLuoQueDialog.asStateFlow()
+
+    private val _menKeLuoQueShops = MutableStateFlow<List<Foundation>>(emptyList())
+    val menKeLuoQueShops: StateFlow<List<Foundation>> = _menKeLuoQueShops.asStateFlow()
+
     fun initGame(playerCount: Int) {
         viewModelScope.launch {
             gameEngine.initGame(playerCount)
@@ -36,8 +42,12 @@ class GameViewModel @Inject constructor(
         gameEngine.buyMenuCard(playerId, card)
     }
 
-    fun buyShopCard(playerId: Int, shop: ShopCard, foundationIndex: Int) {
-        gameEngine.buyShopCard(playerId, shop, foundationIndex)
+    fun placeShopCard(playerId: Int, shop: ShopCard, foundationIndex: Int) {
+        gameEngine.placeShopCard(playerId, shop, foundationIndex)
+    }
+
+    fun buildShopHouse(playerId: Int, foundationIndex: Int) {
+        gameEngine.buildShopHouse(playerId, foundationIndex)
     }
 
     fun endBuyPhase(playerId: Int) {
@@ -56,8 +66,45 @@ class GameViewModel @Inject constructor(
         gameEngine.selectGuest(playerId, queuePosition)
 
         val menuResult = gameEngine.settleMenuIncome(playerId)
-        val shopResult = gameEngine.settleShopIncome(playerId)
 
+        val state = gameState.value
+        // 门可罗雀：需要让玩家选择一个店铺结算
+        if (state?.activeEvent?.effect == EventEffect.MEN_KE_LUO_QUE) {
+            val shops = gameEngine.getMenKeLuoQueShops(playerId)
+            if (shops.isEmpty()) {
+                // 没有可结算的店铺，直接跳过
+                val shopResult = gameEngine.settleShopIncome(playerId)
+                completeSettlement(menuResult, shopResult)
+                gameEngine.refreshGuestQueue()
+            } else {
+                _menKeLuoQueShops.value = shops
+                _showMenKeLuoQueDialog.value = true
+                // 暂存 menuResult 用于后续完成结算
+                _pendingMenuResult = menuResult
+            }
+        } else {
+            val shopResult = gameEngine.settleShopIncome(playerId)
+            completeSettlement(menuResult, shopResult)
+            gameEngine.refreshGuestQueue()
+        }
+    }
+
+    private var _pendingMenuResult: MenuSettlementResult? = null
+
+    fun onMenKeLuoQueShopSelected(foundationIndex: Int) {
+        val state = gameState.value ?: return
+        val playerId = state.currentPlayer.id
+        val menuResult = _pendingMenuResult ?: return
+
+        val shopResult = gameEngine.settleShopIncome(playerId, selectedShopIndex = foundationIndex)
+        completeSettlement(menuResult, shopResult)
+        gameEngine.refreshGuestQueue()
+
+        _pendingMenuResult = null
+        _showMenKeLuoQueDialog.value = false
+    }
+
+    private fun completeSettlement(menuResult: MenuSettlementResult, shopResult: ShopSettlementResult) {
         _settlementResult.value = SettlementDisplayData(
             tip = gameState.value?.settlementTip ?: 0,
             menuIncome = menuResult.totalIncome,
@@ -68,8 +115,6 @@ class GameViewModel @Inject constructor(
             totalIncome = (gameState.value?.settlementTip ?: 0) +
                     menuResult.totalIncome + shopResult.totalIncome
         )
-
-        gameEngine.refreshGuestQueue()
     }
 
     fun endTurn() {

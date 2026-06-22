@@ -17,9 +17,14 @@ fun CurrentPhasePanel(
             player = currentPlayer,
             menuPool = state.menuPool,
             shopPool = state.shopPool,
+            menuBoughtThisTurn = state.menuBoughtThisTurn,
+            shopPlacedThisTurn = state.shopPlacedThisTurn,
             onBuyMenu = { card -> viewModel.buyMenuCard(currentPlayer.id, card) },
-            onBuyShop = { shop, foundationIndex ->
-                viewModel.buyShopCard(currentPlayer.id, shop, foundationIndex)
+            onPlaceShop = { shop, foundationIndex ->
+                viewModel.placeShopCard(currentPlayer.id, shop, foundationIndex)
+            },
+            onBuildHouse = { foundationIndex ->
+                viewModel.buildShopHouse(currentPlayer.id, foundationIndex)
             },
             onEndPhase = { viewModel.endBuyPhase(currentPlayer.id) }
         )

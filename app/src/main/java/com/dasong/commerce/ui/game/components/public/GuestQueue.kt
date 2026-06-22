@@ -70,7 +70,7 @@ private fun GuestCardView(
         Text(
             guest.shopTypes.joinToString("") { it.displayName.take(2) },
             style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
+            maxLines = 5
         )
     }
 }
