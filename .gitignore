@@ -1,0 +1,32 @@
+# 编译产物
+*.apk
+*.aab
+*.dex
+*.class
+build/
+*/build/
+*/*/build/
+.cxx/
+out/
+
+# Gradle缓存
+.gradle/
+!gradle-wrapper.jar
+gradle-app.setting
+
+# 本地SDK配置（核心，忽略本地修改）
+local.properties
+
+# Android Studio IDE文件
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Mac系统文件
+.DS_Store
+._*
+Thumbs.db
+
+# 日志
+*.log

@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.dasong.commerce.model.card.ShopType
 import com.dasong.commerce.ui.game.SettlementDisplayData
 import com.dasong.commerce.ui.theme.GoldHighlight
 import com.dasong.commerce.util.CurrencyFormatter
@@ -42,10 +43,10 @@ fun SettlementDialog(
                     Text(CurrencyFormatter.format(data.menuIncome))
                 }
 
-                // Show menu cards
+                // Show menu cards with income values
                 if (data.menuCards.isNotEmpty()) {
                     Text(
-                        "菜单牌: ${data.menuCards.joinToString(", ") { it.name }}",
+                        "菜单牌: ${data.menuCards.joinToString(", ") { "${it.name}(${it.baseIncome}两)" }}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -75,8 +76,13 @@ fun SettlementDialog(
 
                 if (data.shopActivations.isNotEmpty()) {
                     data.shopActivations.forEach { activation ->
+                        val baseDesc = if (activation.shop.type == ShopType.GUA_SI) {
+                            "基础收入:🎲 掷出${activation.baseIncome}，"
+                        } else {
+                            "基础收入:${activation.baseIncome}"
+                        }
                         Text(
-                            "  ${activation.shop.name}: ${activation.baseIncome}${if(activation.linkageBonus > 0) " +${activation.linkageBonus}(联动)" else ""} = ${activation.totalIncome}",
+                            "  ${activation.shop.name}: $baseDesc${if(activation.linkageBonus > 0) " +${activation.linkageBonus}(联动)" else ""} = ${activation.totalIncome}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )

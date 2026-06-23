@@ -90,7 +90,7 @@ fun PreparePhasePanel(
                                     modifier = Modifier.fillMaxWidth(),
                                     enabled = canAfford && canPrepare,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                                     )
                                 ) {
                                     Text(

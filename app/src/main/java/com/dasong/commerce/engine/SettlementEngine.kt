@@ -131,8 +131,10 @@ class SettlementEngine {
         val guestShopTypes = guest.shopTypes
         val builtShops = player.foundations.filter { it.hasModel && it.shopCard != null && it.isBuilt }
 
-        // Shops that the guest visits
-        val visitedShops = builtShops.filter { it.shopCard!!.type in guestShopTypes }
+        // Shops that the guest visits (exclude 蹴鞠场: its income is already counted in menu)
+        val visitedShops = builtShops.filter {
+            it.shopCard!!.type in guestShopTypes && it.shopCard!!.type != ShopType.CU_JU
+        }
         val activations = mutableListOf<ShopActivation>()
         val linkageDetails = mutableListOf<LinkageDetail>()
 
