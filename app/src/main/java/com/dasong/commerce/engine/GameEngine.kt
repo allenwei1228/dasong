@@ -267,9 +267,10 @@ class GameEngine(
         // Refresh: draw from deck until queue has 4 guests (or 6 with event)
         val maxQueue = if (state.activeEvent?.effect == EventEffect.ZHANG_DENG_JIE_CAI) 6 else 4
 
+        // 新客人排队到队尾（ArrayList index 0 = 展示 position 最大 = 队尾）
         while (state.guestQueue.size < maxQueue && state.guestDeck.isNotEmpty()) {
             val nextCard = state.guestDeck.removeAt(0)
-            state.guestQueue.add(nextCard)
+            state.guestQueue.add(0, nextCard)
         }
 
         // Check for events in deck

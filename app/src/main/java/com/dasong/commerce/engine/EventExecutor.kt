@@ -27,14 +27,14 @@ class EventExecutor {
                 // Menu consumption +1 (handled in settlement)
             }
             EventEffect.ZHANG_DENG_JIE_CAI -> {
-                // 增加到6人：从Guest牌堆中抽牌填满到6人
+                // 增加到6人：从Guest牌堆中抽牌填满到6人（新客人排到队尾 index 0）
                 while (guestQueue.size < 6 && guestDeck.isNotEmpty()) {
-                    guestQueue.add(guestDeck.removeAt(0))
+                    guestQueue.add(0, guestDeck.removeAt(0))
                 }
-                // 再从Guest牌堆中翻开2个人
+                // 再从Guest牌堆中翻开2个人（同样排到队尾）
                 repeat(2) {
                     if (guestDeck.isNotEmpty()) {
-                        guestQueue.add(guestDeck.removeAt(0))
+                        guestQueue.add(0, guestDeck.removeAt(0))
                     }
                 }
             }
