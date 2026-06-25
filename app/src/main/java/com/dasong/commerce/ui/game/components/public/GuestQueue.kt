@@ -41,6 +41,7 @@ private fun GuestCardView(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(64.dp)
+            .height(120.dp)
             .background(
                 MaterialTheme.colorScheme.secondaryContainer,
                 RoundedCornerShape(8.dp)
@@ -59,7 +60,7 @@ private fun GuestCardView(
             maxLines = 1
         )
         Text(
-            "菜×${guest.menuConsumption}",
+            "消耗菜品×${guest.menuConsumption}",
             style = MaterialTheme.typography.labelSmall
         )
         Text(
@@ -68,7 +69,7 @@ private fun GuestCardView(
             color = MaterialTheme.colorScheme.outline
         )
         Text(
-            guest.shopTypes.joinToString("") { it.displayName.take(2) },
+            guest.shopTypes.joinToString("\n") { it.displayName },
             style = MaterialTheme.typography.labelSmall,
             maxLines = 5
         )

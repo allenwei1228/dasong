@@ -12,4 +12,15 @@ data class MenuCard(
         MenuGrade.TWO -> 3
         MenuGrade.ONE -> 2
     }
+
+
+
+    fun cardGrade(grade: MenuGrade): String {
+        return when (grade) {
+            MenuGrade.ONE -> "一品"
+            MenuGrade.TWO -> "二品"
+            MenuGrade.THREE -> "三品"
+            MenuGrade.FOUR -> "四品"
+        }
+    }
 }
