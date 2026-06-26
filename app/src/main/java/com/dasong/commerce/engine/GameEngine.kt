@@ -24,18 +24,17 @@ class GameEngine(
         val shopPool = deckManager.initShopPool()
         val combinedDeck = deckManager.createCombinedDeck()
 
-        // Draw initial guest queue (4 guests, skip events)
+        // Draw initial guest queue (first 4 guests, skip events)
         val queue = mutableListOf<GuestCard>()
-        val deck = mutableListOf<GuestCard>()
-        val pendingEvents = mutableListOf<EventCard>()
+        val deck = mutableListOf<DeckCard>()
 
         for (item in combinedDeck) {
             when (item) {
-                is GuestCard -> {
-                    if (queue.size < 4) queue.add(item)
+                is DeckCard.Guest -> {
+                    if (queue.size < 4) queue.add(item.card)
                     else deck.add(item)
                 }
-                is EventCard -> pendingEvents.add(item)
+                is DeckCard.Event -> deck.add(item)
             }
         }
 
@@ -263,20 +262,95 @@ class GameEngine(
 
     fun refreshGuestQueue() {
         val state = requireState()
+        drawNextFromDeck(state)
+        _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
+    }
 
-        // Refresh: draw from deck until queue has 4 guests (or 6 with event)
-        val maxQueue = if (state.activeEvent?.effect == EventEffect.ZHANG_DENG_JIE_CAI) 6 else 4
-
-        // 新客人排队到队尾（ArrayList index 0 = 展示 position 最大 = 队尾）
-        while (state.guestQueue.size < maxQueue && state.guestDeck.isNotEmpty()) {
-            val nextCard = state.guestDeck.removeAt(0)
-            state.guestQueue.add(0, nextCard)
+    /**
+     * Draw cards from deck one by one:
+     * - GuestCard: add to queue, continue until queue is full
+     * - EventCard: set announceEvent and pause for UI to confirm
+     * - When deck is empty, reshuffle all guests and events back into the deck
+     */
+    private fun drawNextFromDeck(state: GameState) {
+        val maxQueue = when (state.activeEvent?.effect) {
+            EventEffect.ZHANG_DENG_JIE_CAI -> 6
+            EventEffect.YIN_ZHUANG_SU_GUO -> 2
+            else -> 4
         }
 
-        // Check for events in deck
-        // (Event cards are mixed in - handled during initial setup)
+        // 当牌堆为空且队列需要补满时，重新放回所有客人、事件，洗牌重新放置
+        if (state.guestDeck.isEmpty() && state.guestQueue.size < maxQueue) {
+            state.guestDeck.addAll(deckManager.createCombinedDeck())
+        }
 
+        while (state.guestQueue.size < maxQueue && state.guestDeck.isNotEmpty()) {
+            val deckCard = state.guestDeck.removeAt(0)
+            when (deckCard) {
+                is DeckCard.Guest -> {
+                    // 新客人排队到队尾（index 0 = 展示 position 最大 = 队尾）
+                    state.guestQueue.add(0, deckCard.card)
+                }
+                is DeckCard.Event -> {
+                    // Event card found: pause for UI announcement
+                    state.announceEvent = deckCard.card
+                    state.turnStep = TurnStep.PHASE_3_EVENT_ANNOUNCE
+                    return
+                }
+            }
+        }
+
+        // No more events (or deck empty), proceed to end turn check
+        state.announceEvent = null
         state.turnStep = TurnStep.TURN_END_CHECK
+    }
+
+    /**
+     * Called when the UI confirms the event announcement.
+     * Processes the event and continues drawing from the deck.
+     */
+    fun confirmEventAnnouncement() {
+        val state = requireState()
+        val event = state.announceEvent ?: error("没有待确认的事件")
+
+        when (event.duration) {
+            EventDuration.CONTINUOUS -> {
+                // 先撤销上一个持续事件的效果
+                val prevEvent = state.activeEvent
+                if (prevEvent != null) {
+                    eventExecutor.executeDeactivation(
+                        event = prevEvent,
+                        guestQueue = state.guestQueue
+                    )
+                }
+
+                // 再应用新事件
+                state.activeEvent = event
+
+                // Execute one-time activation effect (e.g., expand queue, discard guests)
+                eventExecutor.executeActivation(
+                    event = event,
+                    guestQueue = state.guestQueue,
+                    guestDeck = state.guestDeck
+                )
+            }
+            EventDuration.IMMEDIATE -> {
+                // Execute immediately and discard
+                eventExecutor.executeImmediate(
+                    event = event,
+                    players = state.players,
+                    guestQueue = state.guestQueue,
+                    guestDeck = state.guestDeck,
+                    menuPool = state.menuPool
+                )
+                // Immediate events do NOT become activeEvent
+            }
+        }
+
+        state.announceEvent = null
+
+        // Continue drawing from deck
+        drawNextFromDeck(state)
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
     }
 

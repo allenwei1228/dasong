@@ -1,7 +1,7 @@
 package com.dasong.commerce.engine
 
-import android.util.Log
 import com.dasong.commerce.model.card.GamePhase
+import com.dasong.commerce.util.LogUtil
 import com.dasong.commerce.model.card.TurnStep
 
 class TurnManager {
@@ -23,7 +23,7 @@ class TurnManager {
             GamePhase.PREPARE -> TurnStep.PHASE_2_PREPARE_OPTIONAL
             GamePhase.SERVE -> TurnStep.PHASE_3_SELECT_GUEST
         }
-        Log.d(TAG, "阶段转换: $prevPhase -> $nextPhase | turnStep=${state.turnStep} | 当前玩家=${state.currentPlayer.name}")
+        LogUtil.d(TAG, "阶段转换: $prevPhase -> $nextPhase | turnStep=${state.turnStep} | 当前玩家=${state.currentPlayer.name}")
     }
 
     fun advanceToNextPlayer(state: GameState) {
@@ -37,6 +37,6 @@ class TurnManager {
         state.settlementShopIncome = 0
         state.menuBoughtThisTurn = false // 重置菜单购买标记
         state.shopPlacedThisTurn = false // 重置店铺放置标记
-        Log.d(TAG, "玩家切换: $prevPlayer -> ${state.currentPlayer.name} | 阶段重置: $prevPhase -> BUY")
+        LogUtil.d(TAG, "玩家切换: $prevPlayer -> ${state.currentPlayer.name} | 阶段重置: $prevPhase -> BUY")
     }
 }

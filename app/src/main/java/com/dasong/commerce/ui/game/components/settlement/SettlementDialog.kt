@@ -81,8 +81,9 @@ fun SettlementDialog(
                         } else {
                             "基础收入:${activation.baseIncome}"
                         }
+                        val penaltyText = if (activation.eventPenalty > 0) " -${activation.eventPenalty}(事件)" else ""
                         Text(
-                            "  ${activation.shop.name}: $baseDesc${if(activation.linkageBonus > 0) " +${activation.linkageBonus}(联动)" else ""} = ${activation.totalIncome}",
+                            "${activation.shop.name}: $baseDesc$penaltyText${if(activation.linkageBonus > 0) " +${activation.linkageBonus}(联动)" else ""} = ${activation.totalIncome}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )

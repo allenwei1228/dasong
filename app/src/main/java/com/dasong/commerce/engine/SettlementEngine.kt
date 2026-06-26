@@ -20,7 +20,8 @@ data class ShopActivation(
     val shop: ShopCard,
     val baseIncome: Int,
     val linkageBonus: Int,
-    val totalIncome: Int
+    val totalIncome: Int,
+    val eventPenalty: Int = 0  // 无尖不商等事件扣除（已从 totalIncome 中扣减）
 )
 
 data class LinkageDetail(
@@ -161,8 +162,10 @@ class SettlementEngine {
             }
 
             // Apply event: 无尖不商 -1
+            var eventPenalty = 0
             if (event?.effect == EventEffect.WU_JIAN_BU_SHANG) {
-                shopIncome = (shopIncome - 1).coerceAtLeast(0)
+                eventPenalty = minOf(1, shopIncome)  // 最多扣除1，不能扣到负数
+                shopIncome -= eventPenalty
             }
 
             // Calculate linkage bonuses
@@ -260,7 +263,7 @@ class SettlementEngine {
             linkageDetails.addAll(shopDetails)
 
             val total = shopIncome + linkageBonus
-            activations.add(ShopActivation(shop, shopIncome, linkageBonus, total))
+            activations.add(ShopActivation(shop, shopIncome, linkageBonus, total, eventPenalty))
             totalIncome += total
         }
 

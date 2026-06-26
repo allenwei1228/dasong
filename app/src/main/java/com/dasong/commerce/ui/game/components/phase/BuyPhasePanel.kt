@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -145,7 +146,7 @@ fun BuyPhasePanel(
                 Spacer(Modifier.height(8.dp))
                 Text("第一步：放置店铺牌（仅支付清理地基费用，一回合一次）", fontWeight = FontWeight.Bold)
 
-                // Select foundation first - only show foundations without shops
+                // Select foundation first - show all foundations, disable those with shops
                 val availableFoundations = player.foundations.filter { it.shopCard == null }
                 if (availableFoundations.isEmpty()) {
                     Text("所有地基已放置店铺", color = MaterialTheme.colorScheme.error)
@@ -153,40 +154,57 @@ fun BuyPhasePanel(
                     Text("选择地基:", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
                     // 与 PlayerPanel 中 FoundationSlots 风格一致的地基选择
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        availableFoundations.forEach { foundation ->
-                            val isSelected = selectedFoundation == foundation.index
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .background(
-                                        if (isSelected) GoldHighlight.copy(alpha = 0.4f)
-                                        else FoundationEmpty,
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .border(
-                                        width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) GoldHighlight else Color.Gray,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { selectedFoundation = foundation.index },
-                                contentAlignment = Alignment.Center
+                    Column {
+                        for (row in 0..1) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        "#${foundation.index + 1}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                    Text(
-                                        "清理${foundation.clearCost}两",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.Gray
-                                    )
+                                for (col in 0..3) {
+                                    val gridIndex = row * 4 + col
+                                    val foundation = player.foundations.getOrNull(gridIndex)
+                                    if (foundation == null) continue
+                                    val hasShop = foundation.shopCard != null
+                                    val isSelected = selectedFoundation == foundation.index
+                                    val isAvailable = !hasShop
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(68.dp)
+                                            .background(
+                                                if (isSelected) GoldHighlight.copy(alpha = 0.4f)
+                                                else FoundationEmpty,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .border(
+                                                width = if (isSelected) 2.dp else 1.dp,
+                                                color = if (isSelected) GoldHighlight else Color.Gray,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable(enabled = isAvailable) { selectedFoundation = foundation.index },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                "#${foundation.index + 1}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                            if (hasShop) {
+                                                Text(
+                                                    "已占用",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.error
+                                                )
+                                            } else {
+                                                Text(
+                                                    "清理${foundation.clearCost}两",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.Gray
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

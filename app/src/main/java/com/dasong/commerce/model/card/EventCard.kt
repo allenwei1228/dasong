@@ -5,5 +5,6 @@ data class EventCard(
     val name: String,
     val type: EventType,
     val description: String,
-    val effect: EventEffect
+    val effect: EventEffect,
+    val duration: EventDuration = EventDuration.CONTINUOUS
 )

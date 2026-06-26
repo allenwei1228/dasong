@@ -75,7 +75,7 @@ class GameViewModel @Inject constructor(
                 // 没有可结算的店铺，直接跳过
                 val shopResult = gameEngine.settleShopIncome(playerId)
                 completeSettlement(menuResult, shopResult)
-                gameEngine.refreshGuestQueue()
+                // refreshGuestQueue 推迟到 dismissSettlement 中执行
             } else {
                 _menKeLuoQueShops.value = shops
                 _showMenKeLuoQueDialog.value = true
@@ -85,7 +85,7 @@ class GameViewModel @Inject constructor(
         } else {
             val shopResult = gameEngine.settleShopIncome(playerId)
             completeSettlement(menuResult, shopResult)
-            gameEngine.refreshGuestQueue()
+            // refreshGuestQueue 推迟到 dismissSettlement 中执行
         }
     }
 
@@ -98,7 +98,7 @@ class GameViewModel @Inject constructor(
 
         val shopResult = gameEngine.settleShopIncome(playerId, selectedShopIndex = foundationIndex)
         completeSettlement(menuResult, shopResult)
-        gameEngine.refreshGuestQueue()
+        // refreshGuestQueue 推迟到 dismissSettlement 中执行
 
         _pendingMenuResult = null
         _showMenKeLuoQueDialog.value = false
@@ -117,15 +117,36 @@ class GameViewModel @Inject constructor(
         )
     }
 
-    fun endTurn() {
-        val state = gameState.value ?: return
-        val winChecker = WinConditionChecker()
+    // ========== 结算弹窗关闭 → 翻牌 → 事件公告/回合切换 ==========
 
+    fun dismissSettlement() {
+        _settlementResult.value = null
+        gameEngine.refreshGuestQueue()
+        proceedAfterRefresh()
+    }
+
+    fun confirmEventAnnouncement() {
+        gameEngine.confirmEventAnnouncement()
+        proceedAfterRefresh()
+    }
+
+    /**
+     * 翻牌后的统一后续处理：
+     * - 如果有事件待公告 → 等 UI 弹出 EventAnnouncementDialog
+     * - 如果没有事件 → 检查胜负 → 显示回合切换弹窗
+     */
+    private fun proceedAfterRefresh() {
+        val state = gameState.value ?: return
+        if (state.announceEvent != null) {
+            // UI 会检测到 announceEvent 并弹出事件公告弹窗，等待 confirmEventAnnouncement
+            return
+        }
+        // 没有待公告的事件，进入回合结束流程
+        val winChecker = WinConditionChecker()
         if (winChecker.checkWin(state.currentPlayer)) {
             _winner.value = state.currentPlayer.name
             return
         }
-
         _showTurnTransition.value = true
     }
 
@@ -133,11 +154,6 @@ class GameViewModel @Inject constructor(
         _showTurnTransition.value = false
         _settlementResult.value = null
         gameEngine.endTurn()
-    }
-
-    fun dismissSettlement() {
-        _settlementResult.value = null
-        endTurn()
     }
 }
 

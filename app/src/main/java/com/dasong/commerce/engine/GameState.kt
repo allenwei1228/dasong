@@ -6,9 +6,10 @@ import com.dasong.commerce.model.card.*
 data class GameState(
     val menuPool: MenuPool = MenuPool(),
     val shopPool: ShopPool = ShopPool(),
-    val guestDeck: MutableList<GuestCard> = mutableListOf(),
+    val guestDeck: MutableList<DeckCard> = mutableListOf(),
     val guestQueue: MutableList<GuestCard> = mutableListOf(),
-    var activeEvent: EventCard? = null,
+    var activeEvent: EventCard? = null, // 当前生效的持续事件牌
+    var announceEvent: EventCard? = null, // 当前需要公告的事件牌（UI展示用）
     val players: List<PlayerState> = emptyList(),
     var currentPlayerIndex: Int = 0,
     var currentPhase: GamePhase = GamePhase.BUY,

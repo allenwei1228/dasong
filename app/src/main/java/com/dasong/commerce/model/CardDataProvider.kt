@@ -89,15 +89,17 @@ object CardDataProvider {
     }
 
     // ===== 事件牌 9张 =====
+    // 持续事件牌: 只要未被覆盖为其他事件，就一直生效
+    // 即时事件牌: 效果立即触发，触发后丢弃
     val eventCards: List<EventCard> = listOf(
-        EventCard(1, "俭以养德", EventType.NEGATIVE, "菜单消耗 -1", EventEffect.JIAN_YI_YANG_DE),
-        EventCard(2, "门可罗雀", EventType.NEGATIVE, "仅选1店铺结算", EventEffect.MEN_KE_LUO_QUE),
-        EventCard(3, "无尖不商", EventType.NEGATIVE, "店铺收入-1", EventEffect.WU_JIAN_BU_SHANG),
-        EventCard(4, "时和年丰", EventType.POSITIVE, "菜单消耗+1", EventEffect.SHI_HE_NIAN_FENG),
-        EventCard(5, "张灯结彩", EventType.POSITIVE, "队列扩为6张", EventEffect.ZHANG_DENG_JIE_CAI),
-        EventCard(6, "银装素裹", EventType.NEGATIVE, "弃置最右2张", EventEffect.YIN_ZHUANG_SU_GUO),
-        EventCard(7, "辞旧迎新", EventType.RESHUFFLE, "重洗队列", EventEffect.CI_JIU_YING_XIN),
-        EventCard(8, "苛捐杂税", EventType.NEGATIVE, "每店铺模型付2铜钱", EventEffect.KE_JUAN_ZA_SHUI),
-        EventCard(9, "硕果累累", EventType.POSITIVE, "每人拿2张四品菜单", EventEffect.SHUO_GUO_LEI_LEI)
+        EventCard(1, "俭以养德", EventType.NEGATIVE, "菜单消耗 -1", EventEffect.JIAN_YI_YANG_DE, EventDuration.CONTINUOUS),
+        EventCard(2, "门可罗雀", EventType.NEGATIVE, "仅选1店铺结算", EventEffect.MEN_KE_LUO_QUE, EventDuration.CONTINUOUS),
+        EventCard(3, "无尖不商", EventType.NEGATIVE, "店铺收入-1", EventEffect.WU_JIAN_BU_SHANG, EventDuration.CONTINUOUS),
+        EventCard(4, "时和年丰", EventType.POSITIVE, "菜单消耗+1", EventEffect.SHI_HE_NIAN_FENG, EventDuration.CONTINUOUS),
+        EventCard(5, "张灯结彩", EventType.POSITIVE, "队列扩为6张", EventEffect.ZHANG_DENG_JIE_CAI, EventDuration.CONTINUOUS),
+        EventCard(6, "银装素裹", EventType.NEGATIVE, "弃置最右2张", EventEffect.YIN_ZHUANG_SU_GUO, EventDuration.CONTINUOUS),
+        EventCard(7, "辞旧迎新", EventType.RESHUFFLE, "重洗队列", EventEffect.CI_JIU_YING_XIN, EventDuration.IMMEDIATE),
+        EventCard(8, "苛捐杂税", EventType.NEGATIVE, "每店铺模型付2铜钱", EventEffect.KE_JUAN_ZA_SHUI, EventDuration.IMMEDIATE),
+        EventCard(9, "硕果累累", EventType.POSITIVE, "每人拿2张四品菜单", EventEffect.SHUO_GUO_LEI_LEI, EventDuration.IMMEDIATE)
     )
 }

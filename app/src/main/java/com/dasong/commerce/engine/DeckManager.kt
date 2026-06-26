@@ -7,7 +7,7 @@ import com.dasong.commerce.model.PlayerState
 import com.dasong.commerce.model.ShopPool
 import com.dasong.commerce.model.card.*
 
-class DeckManager {
+open class DeckManager {
 
     private val allMenuCards = CardDataProvider.menuCards
     private val allShopCards = CardDataProvider.shopCards
@@ -36,81 +36,43 @@ class DeckManager {
         return pool
     }
 
-    fun initGuestDeck(): Pair<MutableList<GuestCard>, MutableList<GuestCard>> {
-        val guestDeck = allGuestCards.toMutableList()
-        val eventCards = allEventCards.toMutableList()
-        guestDeck.shuffle()
-        eventCards.shuffle()
-
-        // Combine guests + events, with events interspersed
-        val combined = mutableListOf<Any>()
-        val guestIterator = guestDeck.iterator()
-        val eventIterator = eventCards.iterator()
-
-        // Insert events at intervals
-        var eventInterval = guestDeck.size / (eventCards.size + 1)
-        var counter = 0
-        while (guestIterator.hasNext()) {
-            combined.add(guestIterator.next())
-            counter++
-            if (counter >= eventInterval && eventIterator.hasNext()) {
-                combined.add(eventIterator.next())
-                counter = 0
-            }
-        }
-        while (eventIterator.hasNext()) {
-            combined.add(eventIterator.next())
-        }
-
-        // Draw initial queue
-        val queue = mutableListOf<GuestCard>()
-        val deck = mutableListOf<GuestCard>()
-
-        for (item in combined) {
-            when (item) {
-                is GuestCard -> {
-                    if (queue.size < 4) {
-                        queue.add(item)
-                    } else {
-                        deck.add(item)
-                    }
-                }
-                is EventCard -> deck.add(GuestCard(-item.id, item.name, 0, emptyList()))
-                // Mark as "skip" placeholder - actually we need a different approach
-            }
-        }
-
-        // Simpler approach: just shuffle guests, and intermix events separately
-        return Pair(guestDeck, queue)
-    }
-
     /**
-     * Create combined guest+event deck properly
+     * Create combined guest+event deck with events interspersed among guests.
+     * Returns the full combined deck and the initial guest queue (first 4 guests).
      */
-    fun createCombinedDeck(): MutableList<Any> {
-        val combined = mutableListOf<Any>()
+    open fun createCombinedDeck(): MutableList<DeckCard> {
+        val combined = mutableListOf<DeckCard>()
         val guests = allGuestCards.toMutableList().also { it.shuffle() }
         val events = allEventCards.toMutableList().also { it.shuffle() }
 
         // Distribute events throughout the guest deck
         val totalGuests = guests.size
         val totalEvents = events.size
-        val interval = totalGuests / (totalEvents + 1)
-
-        var guestIdx = 0
-        var eventIdx = 0
-        var counter = 0
-
-        while (guestIdx < totalGuests) {
-            combined.add(guests[guestIdx++])
-            counter++
-            if (counter >= interval && eventIdx < totalEvents) {
-                combined.add(events[eventIdx++])
-                counter = 0
+        val interval = if (totalEvents > 0) totalGuests / (totalEvents + 1) else totalGuests
+        if (interval == 0) {
+            // Every guest followed by an event
+            guests.forEachIndexed { i, guest ->
+                combined.add(DeckCard.Guest(guest))
+                if (i < totalEvents) {
+                    combined.add(DeckCard.Event(events[i]))
+                }
             }
-        }
-        while (eventIdx < totalEvents) {
-            combined.add(events[eventIdx++])
+        } else {
+            var guestIdx = 0
+            var eventIdx = 0
+            var counter = 0
+
+            while (guestIdx < totalGuests) {
+                combined.add(DeckCard.Guest(guests[guestIdx++]))
+                counter++
+                if (counter >= interval && eventIdx < totalEvents) {
+                    combined.add(DeckCard.Event(events[eventIdx++]))
+                    counter = 0
+                }
+            }
+            while (eventIdx < totalEvents) {
+                combined.add(DeckCard.Event(events[eventIdx++]))
+            }
         }
 
         return combined

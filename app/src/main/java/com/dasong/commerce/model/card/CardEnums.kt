@@ -19,6 +19,8 @@ enum class ShopType(val displayName: String) {
 
 enum class EventType { POSITIVE, NEGATIVE, RESHUFFLE }
 
+enum class EventDuration { CONTINUOUS, IMMEDIATE }
+
 enum class EventEffect {
     JIAN_YI_YANG_DE,
     MEN_KE_LUO_QUE,
@@ -40,6 +42,7 @@ enum class TurnStep {
     PHASE_3_SETTLE_MENU,
     PHASE_3_SETTLE_SHOP,
     PHASE_3_REFRESH_GUEST,
+    PHASE_3_EVENT_ANNOUNCE,
     TURN_END_CHECK
 }
 
