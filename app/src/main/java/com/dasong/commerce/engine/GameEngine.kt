@@ -17,7 +17,7 @@ class GameEngine(
     private val _gameState = MutableStateFlow<GameState?>(null)
     val gameState: StateFlow<GameState?> = _gameState.asStateFlow()
 
-    fun initGame(playerCount: Int) {
+    fun initGame(playerCount: Int, playerNames: List<String> = emptyList()) {
         require(playerCount in 2..4) { "玩家数量必须在2-4之间" }
 
         val menuPool = deckManager.initMenuPool()
@@ -38,9 +38,10 @@ class GameEngine(
             }
         }
 
-        // Create players
+        // Create players with custom names (联机模式) or default names (单机模式)
+        val names = if (playerNames.size == playerCount) playerNames else emptyList()
         val players = (1..playerCount).map { i ->
-            val name = "玩家$i"
+            val name = names.getOrElse(i - 1) { "玩家$i" }
             val menuCards = deckManager.getInitialMenuForPlayer()
             PlayerState(
                 id = i,

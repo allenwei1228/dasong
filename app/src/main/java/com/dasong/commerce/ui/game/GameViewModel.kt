@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.dasong.commerce.engine.*
 import com.dasong.commerce.model.*
 import com.dasong.commerce.model.card.*
+import com.dasong.commerce.online.OnlineManager
+import com.dasong.commerce.online.RoomStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -32,9 +34,22 @@ class GameViewModel @Inject constructor(
     private val _menKeLuoQueShops = MutableStateFlow<List<Foundation>>(emptyList())
     val menKeLuoQueShops: StateFlow<List<Foundation>> = _menKeLuoQueShops.asStateFlow()
 
-    fun initGame(playerCount: Int) {
+    fun initGame(playerCount: Int, playerNames: List<String> = emptyList()) {
         viewModelScope.launch {
-            gameEngine.initGame(playerCount)
+            // 联机模式：优先使用传入的玩家名称，否则从 OnlineManager 获取
+            val names = if (playerNames.isNotEmpty()) {
+                playerNames
+            } else {
+                val room = OnlineManager.roomFlow.value
+                if (room != null && room.status == RoomStatus.PLAYING) {
+                    room.playerIds.map { id ->
+                        room.playerNames[id] ?: "玩家${room.playerIds.indexOf(id) + 1}"
+                    }
+                } else {
+                    emptyList()
+                }
+            }
+            gameEngine.initGame(playerCount, names)
         }
     }
 

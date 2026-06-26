@@ -26,6 +26,8 @@ import com.dasong.commerce.ui.theme.SongRed
 fun HomeScreen(
     onStartGame: () -> Unit,
     onGuide: () -> Unit,
+    onCreateRoom: () -> Unit = {},
+    onJoinRoom: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     Column(
@@ -77,8 +79,8 @@ fun HomeScreen(
         MenuButton(
             text = "创建房间",
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            onClick = { /* TODO */ },
-            enabled = false
+            onClick = onCreateRoom,
+            enabled = true
         )
 
         Spacer(Modifier.height(16.dp))
@@ -86,8 +88,8 @@ fun HomeScreen(
         MenuButton(
             text = "加入房间",
             icon = { Icon(Icons.Default.Link, contentDescription = null) },
-            onClick = { /* TODO */ },
-            enabled = false
+            onClick = onJoinRoom,
+            enabled = true
         )
 
         Spacer(Modifier.height(48.dp))

@@ -1,6 +1,7 @@
 package com.dasong.commerce.di
 
 import com.dasong.commerce.engine.*
+import com.dasong.commerce.online.SupabaseProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -10,6 +11,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    @Provides
+    @Singleton
+    fun provideSupabaseProvider(): SupabaseProvider = SupabaseProvider()
 
     @Provides
     @Singleton

@@ -9,8 +9,11 @@ import androidx.navigation.navArgument
 import com.dasong.commerce.ui.home.HomeScreen
 import com.dasong.commerce.ui.guide.GuideScreen
 import com.dasong.commerce.ui.setup.SetupScreen
+import com.dasong.commerce.ui.room.RoomScreen
 import com.dasong.commerce.ui.game.GameScreen
 import com.dasong.commerce.ui.result.ResultScreen
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 @Composable
 fun AppNavGraph() {
@@ -20,7 +23,9 @@ fun AppNavGraph() {
         composable("home") {
             HomeScreen(
                 onStartGame = { navController.navigate("setup") },
-                onGuide = { navController.navigate("guide") }
+                onGuide = { navController.navigate("guide") },
+                onCreateRoom = { navController.navigate("room") },
+                onJoinRoom = { navController.navigate("room") }
             )
         }
 
@@ -39,6 +44,49 @@ fun AppNavGraph() {
             )
         }
 
+        composable("room") {
+            RoomScreen(
+                onBack = { navController.popBackStack() },
+                onStartGame = { playerCount, playerNames ->
+                    val encodedNames = URLEncoder.encode(
+                        playerNames.joinToString(","),
+                        "UTF-8"
+                    )
+                    navController.navigate("game/$playerCount/$encodedNames") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = "game/{playerCount}/{playerNames}",
+            arguments = listOf(
+                navArgument("playerCount") { type = NavType.IntType },
+                navArgument("playerNames") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            val playerCount = backStackEntry.arguments?.getInt("playerCount") ?: 2
+            val namesStr = backStackEntry.arguments?.getString("playerNames") ?: ""
+            val playerNames = if (namesStr.isNotEmpty()) {
+                URLDecoder.decode(namesStr, "UTF-8").split(",")
+            } else {
+                emptyList()
+            }
+            GameScreen(
+                playerCount = playerCount,
+                playerNames = playerNames,
+                onGameEnd = { winnerName ->
+                    navController.navigate("result/$winnerName") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(
             route = "game/{playerCount}",
             arguments = listOf(navArgument("playerCount") { type = NavType.IntType })
@@ -46,6 +94,7 @@ fun AppNavGraph() {
             val playerCount = backStackEntry.arguments?.getInt("playerCount") ?: 2
             GameScreen(
                 playerCount = playerCount,
+                playerNames = emptyList(),
                 onGameEnd = { winnerName ->
                     navController.navigate("result/$winnerName") {
                         popUpTo("home") { inclusive = true }

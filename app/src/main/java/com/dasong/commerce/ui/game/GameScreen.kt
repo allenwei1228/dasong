@@ -26,6 +26,7 @@ import com.dasong.commerce.model.card.ShopCard
 @Composable
 fun GameScreen(
     playerCount: Int,
+    playerNames: List<String> = emptyList(),
     onGameEnd: (String) -> Unit,
     viewModel: GameViewModel = hiltViewModel()
 ) {
@@ -37,7 +38,7 @@ fun GameScreen(
     val menKeLuoQueShops by viewModel.menKeLuoQueShops.collectAsStateWithLifecycle()
 
     LaunchedEffect(playerCount) {
-        viewModel.initGame(playerCount)
+        viewModel.initGame(playerCount, playerNames)
     }
 
     LaunchedEffect(winner) {
