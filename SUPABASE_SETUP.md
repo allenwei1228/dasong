@@ -94,8 +94,8 @@ SUPABASE_ANON_KEY=eyJhbGciOi你的anon-key
 
 **示例**（请勿直接复制，填入你自己的值）：
 ```properties
-SUPABASE_URL=https://abcdefghijklm.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ...
+SUPABASE_URL=https://drqbgjkablbnhoxyoohd.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_lEOdkBYxevKSOmIFBDhJcA_LI95s1p1
 ```
 
 ---
