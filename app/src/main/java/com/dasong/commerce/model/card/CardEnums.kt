@@ -1,7 +1,11 @@
 package com.dasong.commerce.model.card
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class MenuGrade { ONE, TWO, THREE, FOUR }
 
+@Serializable
 enum class ShopType(val displayName: String) {
     GUA_SI("卦肆"),
     SHU_FANG("书坊"),
@@ -17,10 +21,13 @@ enum class ShopType(val displayName: String) {
     SHOU_SHI("首饰铺")
 }
 
+@Serializable
 enum class EventType { POSITIVE, NEGATIVE, RESHUFFLE }
 
+@Serializable
 enum class EventDuration { CONTINUOUS, IMMEDIATE }
 
+@Serializable
 enum class EventEffect {
     JIAN_YI_YANG_DE,
     MEN_KE_LUO_QUE,
@@ -33,8 +40,10 @@ enum class EventEffect {
     SHUO_GUO_LEI_LEI
 }
 
+@Serializable
 enum class GamePhase { BUY, PREPARE, SERVE }
 
+@Serializable
 enum class TurnStep {
     PHASE_1_BUY_MENU_OR_SHOP,
     PHASE_2_PREPARE_OPTIONAL,
@@ -46,6 +55,7 @@ enum class TurnStep {
     TURN_END_CHECK
 }
 
+@Serializable
 enum class IncomeType {
     FIXED,
     DICE,

@@ -1,6 +1,7 @@
 package com.dasong.commerce.online
 
 import com.dasong.commerce.BuildConfig
+import com.dasong.commerce.engine.GameState
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
@@ -17,6 +18,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
 
 object OnlineManager {
 
@@ -27,6 +31,12 @@ object OnlineManager {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // JSON 序列化器（忽略未知字段，兼容未来扩展）
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
     // Supabase 客户端（懒初始化）
     private val supabase by lazy {
@@ -50,10 +60,20 @@ object OnlineManager {
     private val _roomFlow = MutableStateFlow<RoomData?>(null)
     val roomFlow: StateFlow<RoomData?> = _roomFlow.asStateFlow()
 
+    /** 从服务器同步下来的最新游戏状态（非当前玩家回合时，通过此 Flow 接收更新） */
+    private val _syncedGameState = MutableStateFlow<GameState?>(null)
+    val syncedGameState: StateFlow<GameState?> = _syncedGameState.asStateFlow()
+
     private val _events = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val events: SharedFlow<String> = _events.asSharedFlow()
 
     private var syncJob: kotlinx.coroutines.Job? = null
+
+    /** 本地上次推送的版本号，用于避免自己推送的状态触发重复刷新 */
+    private var lastPublishedVersion: Long = -1
+
+    /** 发布锁：防止多个协程并发推送到 Supabase 导致旧状态覆盖新状态 */
+    private val publishMutex = Mutex()
 
     fun getMySeatOrder(): Int {
         val room = _roomFlow.value ?: return 1
@@ -63,6 +83,17 @@ object OnlineManager {
     }
 
     fun getMyName(): String = _playerName.value
+
+    /**
+     * 判断当前是否轮到本地玩家操作。
+     * 通过比较 GameState.currentPlayerIndex 对应的玩家 seatOrder 与本地玩家的 seatOrder。
+     */
+    fun isMyTurn(gameState: GameState?): Boolean {
+        val state = gameState ?: return false
+        if (state.players.isEmpty()) return false
+        val currentPlayerSeatOrder = state.players[state.currentPlayerIndex].seatOrder
+        return currentPlayerSeatOrder == getMySeatOrder()
+    }
 
     // ============ 连接与认证 ============
 
@@ -167,6 +198,8 @@ object OnlineManager {
         syncJob?.cancel()
         syncJob = null
         _roomFlow.value = null
+        _syncedGameState.value = null
+        lastPublishedVersion = -1
     }
 
     fun leaveRoom() {
@@ -174,7 +207,9 @@ object OnlineManager {
         syncJob = null
         _connectionState.value = ConnectionStatus.DISCONNECTED
         _roomFlow.value = null
+        _syncedGameState.value = null
         _playerId.value = ""
+        lastPublishedVersion = -1
     }
 
     suspend fun addLocalPlayer(playerName: String) {
@@ -199,6 +234,57 @@ object OnlineManager {
         _roomFlow.value = updatedRoom
     }
 
+    // ============ 游戏状态同步 ============
+
+    /**
+     * 房主发布初始游戏状态到 Supabase。
+     */
+    suspend fun publishInitialGameState(gameState: GameState) {
+        publishMutex.withLock {
+            doPublishGameState(gameState)
+        }
+    }
+
+    /**
+     * 当前玩家操作后推送游戏状态到 Supabase。
+     * 只有当前回合玩家调用此方法。
+     */
+    suspend fun publishGameState(gameState: GameState) {
+        publishMutex.withLock {
+            // 版本守卫：如果已发布过更新的版本，跳过旧版本推送，防止竞态覆盖
+            if (gameState.stateVersion <= lastPublishedVersion) return
+            doPublishGameState(gameState)
+        }
+    }
+
+    /**
+     * 实际执行推送（需在 publishMutex 锁内调用）。
+     */
+    private suspend fun doPublishGameState(gameState: GameState) {
+        val room = _roomFlow.value ?: error("当前未加入任何房间")
+        val dto = GameStateDto(
+            roomCode = room.roomCode,
+            state = gameState,
+            version = gameState.stateVersion,
+        )
+        supabase.from("game_states").upsert(dto)
+        lastPublishedVersion = gameState.stateVersion
+    }
+
+    /**
+     * 从 Supabase 加载游戏状态。
+     */
+    private suspend fun loadGameState(roomCode: String): GameState? {
+        return try {
+            supabase.from("game_states").select {
+                filter { eq("room_code", roomCode) }
+            }.decodeSingleOrNull<GameStateDto>()
+                ?.state
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // ============ 辅助方法 ============
 
     private fun generateRoomCode(): String = buildString {
@@ -211,7 +297,8 @@ object OnlineManager {
     }
 
     /**
-     * 每秒轮询 Supabase 获取房间最新状态。
+     * 每秒轮询 Supabase 获取房间状态和游戏状态。
+     * 游戏状态同步：当 version > 本地已处理版本时，推送给 UI。
      */
     private fun startSync(roomCode: String) {
         syncJob?.cancel()
@@ -219,13 +306,21 @@ object OnlineManager {
             while (isActive) {
                 _connectionState.value = ConnectionStatus.SYNCING
                 runCatching {
-                    supabase.from("rooms").select {
+                    val roomDto = supabase.from("rooms").select {
                         filter { eq("room_code", roomCode) }
                     }.decodeSingleOrNull<RoomDto>()
-                        ?.toRoomData()
-                }.onSuccess { room ->
+                    val gameStateDto = supabase.from("game_states").select {
+                        filter { eq("room_code", roomCode) }
+                    }.decodeSingleOrNull<GameStateDto>()
+                    roomDto?.toRoomData() to gameStateDto
+                }.onSuccess { (room, gameStateDto) ->
                     if (room != null) {
                         _roomFlow.value = room
+                    }
+                    // 游戏状态同步：仅当服务端版本比本地新时才更新
+                    if (gameStateDto != null && gameStateDto.version > lastPublishedVersion) {
+                        _syncedGameState.value = gameStateDto.state
+                        lastPublishedVersion = gameStateDto.version
                     }
                     _connectionState.value = ConnectionStatus.CONNECTED
                 }.onFailure {

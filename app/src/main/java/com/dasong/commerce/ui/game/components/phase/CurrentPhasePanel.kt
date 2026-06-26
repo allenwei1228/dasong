@@ -8,7 +8,8 @@ import com.dasong.commerce.ui.game.GameViewModel
 @Composable
 fun CurrentPhasePanel(
     state: GameState,
-    viewModel: GameViewModel
+    viewModel: GameViewModel,
+    enabled: Boolean = true
 ) {
     val currentPlayer = state.currentPlayer
 
@@ -26,7 +27,8 @@ fun CurrentPhasePanel(
             onBuildHouse = { foundationIndex ->
                 viewModel.buildShopHouse(currentPlayer.id, foundationIndex)
             },
-            onEndPhase = { viewModel.endBuyPhase(currentPlayer.id) }
+            onEndPhase = { viewModel.endBuyPhase(currentPlayer.id) },
+            enabled = enabled
         )
         GamePhase.PREPARE -> {
             val canPrepare = currentPlayer.canPrepare
@@ -34,13 +36,15 @@ fun CurrentPhasePanel(
                 player = currentPlayer,
                 canPrepare = canPrepare,
                 onRemove = { card -> viewModel.removeMenu(currentPlayer.id, card) },
-                onSkip = { viewModel.skipPreparePhase() }
+                onSkip = { viewModel.skipPreparePhase() },
+                enabled = enabled
             )
         }
         GamePhase.SERVE -> ServePhasePanel(
             guestQueue = state.guestQueue,
             currentPlayer = currentPlayer,
-            onSelectGuest = { pos -> viewModel.selectGuest(currentPlayer.id, pos) }
+            onSelectGuest = { pos -> viewModel.selectGuest(currentPlayer.id, pos) },
+            enabled = enabled
         )
     }
 }

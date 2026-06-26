@@ -2,7 +2,19 @@ package com.dasong.commerce.engine
 
 import com.dasong.commerce.model.*
 import com.dasong.commerce.model.card.*
+import kotlinx.serialization.Serializable
 
+/**
+ * 按阶段记录玩家本回合的操作
+ */
+@Serializable
+data class TurnActionRecord(
+    val buyPhase: MutableList<String> = mutableListOf(),     // 阶段1·购买
+    val preparePhase: MutableList<String> = mutableListOf(), // 阶段2·备菜
+    val servePhase: MutableList<String> = mutableListOf()    // 阶段3·招待
+)
+
+@Serializable
 data class GameState(
     val menuPool: MenuPool = MenuPool(),
     val shopPool: ShopPool = ShopPool(),
@@ -22,7 +34,9 @@ data class GameState(
     var menuBoughtThisTurn: Boolean = false, // 本回合是否已购买菜单牌
     var shopPlacedThisTurn: Boolean = false, // 本回合是否已放置店铺牌
     var pendingMenKeLuoQue: Boolean = false, // 门可罗雀：等待玩家选择店铺
-    var stateVersion: Long = 0
+    var stateVersion: Long = 0,
+    var turnHistory: MutableList<String> = mutableListOf(), // 本轮已完成回合的玩家操作摘要（不含当前玩家）
+    var currentTurnRecord: TurnActionRecord = TurnActionRecord() // 当前回合玩家按阶段记录的操作
 ) {
     val currentPlayer: PlayerState get() = players[currentPlayerIndex]
 }

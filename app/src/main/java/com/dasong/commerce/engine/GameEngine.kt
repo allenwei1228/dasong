@@ -81,6 +81,7 @@ class GameEngine(
         player.funds -= card.cost
         player.kitchen.add(card)
         state.menuBoughtThisTurn = true
+        state.currentTurnRecord.buyPhase.add("购买菜单牌[${card.name}]")
 
         // Remove from menu pool
         state.menuPool.getPile(card.grade).remove(card)
@@ -113,6 +114,7 @@ class GameEngine(
         foundation.isBuilt = false // 店铺效果不生效
 
         state.shopPlacedThisTurn = true
+        state.currentTurnRecord.buyPhase.add("放置店铺[${shop.name}]于#${foundationIndex + 1}号地")
 
         // Remove from shop pool and replenish
         state.shopPool.available.remove(shop)
@@ -138,6 +140,7 @@ class GameEngine(
 
         player.funds -= buildCost
         foundation.isBuilt = true // 店铺效果生效
+        state.currentTurnRecord.buyPhase.add("建房[${foundation.shopCard!!.name}](#${foundationIndex + 1}号地)")
 
         // 如果建造后无可再建造的房屋，自动跳过建房步骤进入下一阶段
         val hasUnbuiltShops = player.foundations.any { it.shopCard != null && !it.isBuilt }
@@ -167,6 +170,7 @@ class GameEngine(
 
         player.funds -= 3
         player.kitchen.remove(card)
+        state.currentTurnRecord.preparePhase.add("备菜：舍弃[${card.name}]")
 
         // 舍弃一张菜单牌后，直接进入下一阶段
         turnManager.advanceToNextPhase(state)
@@ -210,6 +214,7 @@ class GameEngine(
         player.funds += accumulatedTip
 
         state.selectedGuest = guest
+        state.currentTurnRecord.servePhase.add("招待客人[${guest.name}]")
         state.turnStep = TurnStep.PHASE_3_SETTLE_MENU
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
     }
@@ -366,8 +371,45 @@ class GameEngine(
             return
         }
 
+        // 记录本回合操作摘要到历史（按阶段分组）
+        val summary = buildTurnSummary(player.name, state.currentTurnRecord)
+        if (summary.isNotBlank()) {
+            state.turnHistory.add(summary)
+        }
+        state.currentTurnRecord = TurnActionRecord()
+
         turnManager.advanceToNextPlayer(state)
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
+    }
+
+    private fun buildTurnSummary(playerName: String, record: TurnActionRecord): String {
+        val parts = mutableListOf<String>()
+        if (record.buyPhase.isNotEmpty()) parts.add("购买:${record.buyPhase.joinToString("、")}")
+        if (record.preparePhase.isNotEmpty()) parts.add("备菜:${record.preparePhase.joinToString("、")}")
+        if (record.servePhase.isNotEmpty()) parts.add("招待:${record.servePhase.joinToString("、")}")
+        if (parts.isEmpty()) return ""
+        return "$playerName: ${parts.joinToString("；")}"
+    }
+
+    // ========== 联机模式支持 ==========
+
+    /**
+     * 从远程状态初始化游戏（非房主玩家使用）。
+     * 直接设置 GameState 来自服务器下发的初始状态。
+     */
+    fun initGameFromRemote(state: GameState) {
+        _gameState.value = state
+    }
+
+    /**
+     * 应用远程同步下来的游戏状态（非当前回合玩家使用）。
+     * 当服务器推送的 version 比本地新时调用。
+     */
+    fun applyRemoteState(state: GameState) {
+        val local = _gameState.value
+        if (local == null || state.stateVersion > local.stateVersion) {
+            _gameState.value = state
+        }
     }
 
     private fun requireState(): GameState =

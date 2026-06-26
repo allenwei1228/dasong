@@ -33,9 +33,10 @@ fun RoomScreen(
     val shouldNavigateToGame by viewModel.shouldNavigateToGame.collectAsState()
     val playerNames by viewModel.playerNames.collectAsState()
     val playerCount by viewModel.playerCount.collectAsState()
+    // 使用 OnlineManager.roomFlow 直接订阅轮询更新，而非 uiState 中的快照
+    val room by viewModel.currentRoom.collectAsState()
 
     var maxPlayers by remember { mutableIntStateOf(2) }
-    val room = uiState.currentRoom
     val clipboardManager = LocalClipboardManager.current
 
     // 监听游戏开始
@@ -159,19 +160,22 @@ fun RoomScreen(
                     }
                 }
             } else {
+                val currentRoom = room!!
                 // ============ 房间信息区域 ============
-                RoomInfoCard(
-                    room = room,
-                    isRoomOwner = viewModel.isRoomOwner,
-                    onStartGame = viewModel::startGame,
-                    onCopyRoomCode = {
-                        clipboardManager.setText(AnnotatedString(room.roomCode))
-                    },
-                    onAddLocalPlayer = viewModel::addLocalPlayer,
-                )
+                if (currentRoom != null) {
+                    RoomInfoCard(
+                        room = currentRoom,
+                        isRoomOwner = viewModel.isRoomOwner,
+                        onStartGame = viewModel::startGame,
+                        onCopyRoomCode = {
+                            clipboardManager.setText(AnnotatedString(currentRoom.roomCode))
+                        },
+                        onAddLocalPlayer = viewModel::addLocalPlayer,
+                    )
+                }
 
                 // ============ 等待提示（非房主） ============
-                if (!viewModel.isRoomOwner && room.status == RoomStatus.WAITING) {
+                if (!viewModel.isRoomOwner && currentRoom.status == RoomStatus.WAITING) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -187,13 +191,13 @@ fun RoomScreen(
                 }
 
                 // 非房主自动检测游戏开始
-                LaunchedEffect(room.status) {
-                    if (!viewModel.isRoomOwner && room.status == RoomStatus.PLAYING) {
+                LaunchedEffect(currentRoom.status) {
+                    if (!viewModel.isRoomOwner && currentRoom.status == RoomStatus.PLAYING) {
                         // 收集玩家名称并触发导航
-                        val names = room.playerIds.map { id ->
-                            room.playerNames[id] ?: "玩家${room.playerIds.indexOf(id) + 1}"
+                        val names = currentRoom.playerIds.map { id ->
+                            currentRoom.playerNames[id] ?: "玩家${currentRoom.playerIds.indexOf(id) + 1}"
                         }
-                        onStartGame(room.playerIds.size, names)
+                        onStartGame(currentRoom.playerIds.size, names)
                     }
                 }
             }

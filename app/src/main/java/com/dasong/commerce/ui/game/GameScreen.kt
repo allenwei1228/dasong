@@ -36,6 +36,10 @@ fun GameScreen(
     val winner by viewModel.winner.collectAsStateWithLifecycle()
     val showMenKeLuoQueDialog by viewModel.showMenKeLuoQueDialog.collectAsStateWithLifecycle()
     val menKeLuoQueShops by viewModel.menKeLuoQueShops.collectAsStateWithLifecycle()
+    val isOnlineMode by viewModel.isOnlineMode.collectAsStateWithLifecycle()
+    val isMyTurn by viewModel.isMyTurn.collectAsStateWithLifecycle()
+    val waitingMessage by viewModel.waitingMessage.collectAsStateWithLifecycle()
+    val showMyTurnReminder by viewModel.showMyTurnReminder.collectAsStateWithLifecycle()
 
     LaunchedEffect(playerCount) {
         viewModel.initGame(playerCount, playerNames)
@@ -47,79 +51,115 @@ fun GameScreen(
 
     val currentState = gameState ?: return
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "玩家${currentState.currentPlayer.seatOrder} - ${currentState.currentPlayer.name}"
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                "玩家${currentState.currentPlayer.seatOrder} - ${currentState.currentPlayer.name}"
+                            )
+                            if (isOnlineMode) {
+                                Text(
+                                    if (isMyTurn) "🔵 你的回合" else "⏳ ${waitingMessage}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isMyTurn)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        InfoPanelButton(
+                            players = currentState.players,
+                            currentPlayerIndex = currentState.currentPlayerIndex,
+                            currentPhase = currentState.currentPhase,
+                            turnHistory = currentState.turnHistory,
+                            currentTurnRecord = currentState.currentTurnRecord
+                        )
+                    }
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                PhaseIndicator(currentPhase = currentState.currentPhase)
+
+                PublicAreaPanel(state = currentState)
+
+                EventCardDisplay(event = currentState.activeEvent)
+
+                PlayerPanelsRow(state = currentState)
+
+                Spacer(Modifier.height(8.dp))
+
+                CurrentPhasePanel(
+                    state = currentState,
+                    viewModel = viewModel,
+                    enabled = !isOnlineMode || isMyTurn
+                )
+            }
+
+            // 联机模式下，仅当前回合玩家显示交互弹窗
+            val showPlayerDialogs = !isOnlineMode || isMyTurn
+
+            // Settlement Dialog
+            if (showPlayerDialogs) {
+                settlementResult?.let { result ->
+                    SettlementDialog(
+                        data = result,
+                        onDismiss = { viewModel.dismissSettlement() }
                     )
-                },
-                actions = {
-                    InfoPanelButton(players = currentState.players)
                 }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-        ) {
-            PhaseIndicator(currentPhase = currentState.currentPhase)
+            }
 
-            PublicAreaPanel(state = currentState)
+            // Event announcement dialog — 所有玩家都弹窗通知，所有人均可确认
+            val eventDialogVisible = currentState.announceEvent != null &&
+                    currentState.turnStep == com.dasong.commerce.model.card.TurnStep.PHASE_3_EVENT_ANNOUNCE
+            if (eventDialogVisible) {
+                EventAnnouncementDialog(
+                    event = currentState.announceEvent!!,
+                    players = currentState.players,
+                    isOverriding = currentState.activeEvent != null &&
+                            currentState.announceEvent?.duration == com.dasong.commerce.model.card.EventDuration.CONTINUOUS,
+                    onConfirm = { viewModel.confirmEventAnnouncement() }
+                )
+            }
 
-            EventCardDisplay(event = currentState.activeEvent)
+            // Turn transition dialog（仅单机模式显示）
+            if (showTurnTransition) {
+                TurnTransitionDialog(
+                    nextPlayer = currentState.players[
+                        (currentState.currentPlayerIndex + 1) % currentState.players.size
+                    ],
+                    onConfirm = { viewModel.confirmTurnTransition() }
+                )
+            }
 
-            PlayerPanelsRow(state = currentState)
+            // 回合切换后提醒“该我操作了”（单机/联机通用）
+            if (showMyTurnReminder) {
+                MyTurnReminderDialog(
+                    player = currentState.currentPlayer,
+                    onDismiss = { viewModel.dismissMyTurnReminder() }
+                )
+            }
 
-            Spacer(Modifier.height(8.dp))
-
-            CurrentPhasePanel(
-                state = currentState,
-                viewModel = viewModel
-            )
-        }
-
-        // Settlement Dialog
-        settlementResult?.let { result ->
-            SettlementDialog(
-                data = result,
-                onDismiss = { viewModel.dismissSettlement() }
-            )
-        }
-
-        // Event announcement dialog
-        if (currentState.announceEvent != null && currentState.turnStep == com.dasong.commerce.model.card.TurnStep.PHASE_3_EVENT_ANNOUNCE) {
-            EventAnnouncementDialog(
-                event = currentState.announceEvent!!,
-                players = currentState.players,
-                isOverriding = currentState.activeEvent != null &&
-                        currentState.announceEvent?.duration == com.dasong.commerce.model.card.EventDuration.CONTINUOUS,
-                onConfirm = { viewModel.confirmEventAnnouncement() }
-            )
-        }
-
-        // Turn transition dialog
-        if (showTurnTransition) {
-            TurnTransitionDialog(
-                nextPlayer = currentState.players[
-                    (currentState.currentPlayerIndex + 1) % currentState.players.size
-                ],
-                onConfirm = { viewModel.confirmTurnTransition() }
-            )
-        }
-
-        // 门可罗雀：选择结算店铺弹窗
-        if (showMenKeLuoQueDialog) {
-            MenKeLuoQueDialog(
-                shops = menKeLuoQueShops,
-                onSelect = { foundationIndex ->
-                    viewModel.onMenKeLuoQueShopSelected(foundationIndex)
-                }
-            )
+            // 门可罗雀：选择结算店铺弹窗
+            if (showPlayerDialogs && showMenKeLuoQueDialog) {
+                MenKeLuoQueDialog(
+                    shops = menKeLuoQueShops,
+                    onSelect = { foundationIndex ->
+                        viewModel.onMenKeLuoQueShopSelected(foundationIndex)
+                    }
+                )
+            }
         }
     }
 }
@@ -233,6 +273,42 @@ fun TurnTransitionDialog(
         confirmButton = {
             Button(onClick = onConfirm) {
                 Text("确认")
+            }
+        }
+    )
+}
+
+@Composable
+fun MyTurnReminderDialog(
+    player: com.dasong.commerce.model.PlayerState,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "🔔 轮到你了",
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "${player.name}，该我操作了！",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "确认后开始你的操作回合。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("开始操作")
             }
         }
     )

@@ -1,5 +1,8 @@
 package com.dasong.commerce.model.card
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class MenuCard(
     val id: Int,
     val name: String,

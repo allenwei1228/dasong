@@ -36,7 +36,8 @@ fun BuyPhasePanel(
     onBuyMenu: (MenuCard) -> Unit,
     onPlaceShop: (ShopCard, Int) -> Unit,
     onBuildHouse: (Int) -> Unit,
-    onEndPhase: () -> Unit
+    onEndPhase: () -> Unit,
+    enabled: Boolean = true
 ) {
     var selectedMode by remember { mutableStateOf<String?>(null) } // "menu" or "shop"
     var selectedFoundation by remember { mutableIntStateOf(-1) }
@@ -52,156 +53,171 @@ fun BuyPhasePanel(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "购买阶段 - 请选择购买类型",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(8.dp))
-
-            // Option A: Buy Menu (互斥：买菜单后不能再买店铺，反之亦然)
-            val canBuyMenu = !menuBoughtThisTurn && !shopPlacedThisTurn
-            Button(
-                onClick = { selectedMode = "menu"; selectedFoundation = -1 },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canBuyMenu,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedMode == "menu" && canBuyMenu)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.surface
-                )
-            ) {
+            if (!enabled) {
+                // 联机模式：非当前玩家回合，显示等待提示，不展示操作按钮
                 Text(
-                    when {
-                        menuBoughtThisTurn -> "购买菜单牌 (本回合已购买)"
-                        shopPlacedThisTurn -> "购买菜单牌 (已放置店铺，不可购买)"
-                        else -> "购买菜单牌"
-                    },
-                    color = Color.Black
+                    "购买阶段",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
                 )
-            }
-
-            if (selectedMode == "menu" && canBuyMenu) {
                 Spacer(Modifier.height(8.dp))
-                MenuGrade.entries.forEach { grade ->
-                    val pile = menuPool.getPile(grade)
-                    val cost = when (grade) {
-                        MenuGrade.ONE -> 9
-                        MenuGrade.TWO -> 6
-                        MenuGrade.THREE -> 3
-                        MenuGrade.FOUR -> 0
-                    }
-                    if (pile.isNotEmpty()) {
-                        val card = pile.first()
-                        val canAfford = player.funds >= cost
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
-                                .clickable { menuDetail = card },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("${card.cardGrade(card.grade)}·${card.name} (${pile.size}张)",
-                                modifier = Modifier.weight(1f, fill = false),
-                                color = Color.Blue)
-                            Button(
-                                onClick = { onBuyMenu(card) },
-                                enabled = canAfford
+                Text(
+                    "⏳ 等待 ${player.name} 操作中……",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    "购买阶段 - 请选择购买类型",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+
+                // Option A: Buy Menu (互斥：买菜单后不能再买店铺，反之亦然)
+                val canBuyMenu = !menuBoughtThisTurn && !shopPlacedThisTurn
+                Button(
+                    onClick = { selectedMode = "menu"; selectedFoundation = -1 },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canBuyMenu,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedMode == "menu" && canBuyMenu)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Text(
+                        when {
+                            menuBoughtThisTurn -> "购买菜单牌 (本回合已购买)"
+                            shopPlacedThisTurn -> "购买菜单牌 (已放置店铺，不可购买)"
+                            else -> "购买菜单牌"
+                        },
+                        color = Color.Black
+                    )
+                }
+
+                if (selectedMode == "menu" && canBuyMenu) {
+                    Spacer(Modifier.height(8.dp))
+                    MenuGrade.entries.forEach { grade ->
+                        val pile = menuPool.getPile(grade)
+                        val cost = when (grade) {
+                            MenuGrade.ONE -> 9
+                            MenuGrade.TWO -> 6
+                            MenuGrade.THREE -> 3
+                            MenuGrade.FOUR -> 0
+                        }
+                        if (pile.isNotEmpty()) {
+                            val card = pile.first()
+                            val canAfford = player.funds >= cost
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                                    .clickable { menuDetail = card },
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("买${cost}两")
+                                Text("${card.cardGrade(card.grade)}·${card.name} (${pile.size}张)",
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    color = Color.Blue)
+                                Button(
+                                    onClick = { onBuyMenu(card) },
+                                    enabled = canAfford
+                                ) {
+                                    Text("买${cost}两")
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(Modifier.height(8.dp))
-
-            // Option B: Place Shop (互斥：放置店铺后不能再买菜单，反之亦然)
-            val canPlaceShop = !menuBoughtThisTurn && !shopPlacedThisTurn
-            Button(
-                onClick = { selectedMode = "shop"; selectedFoundation = -1 },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canPlaceShop,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedMode == "shop" && canPlaceShop)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Text(
-                    when {
-                        shopPlacedThisTurn -> "购买店铺牌 (本回合已放置)"
-                        menuBoughtThisTurn -> "购买店铺牌 (已购买菜单，不可放置)"
-                        else -> "购买店铺牌"
-                    },
-                    color = Color.Black
-                )
-            }
-
-            if (selectedMode == "shop" && canPlaceShop) {
                 Spacer(Modifier.height(8.dp))
-                Text("第一步：放置店铺牌（仅支付清理地基费用，一回合一次）", fontWeight = FontWeight.Bold)
 
-                // Select foundation first - show all foundations, disable those with shops
-                val availableFoundations = player.foundations.filter { it.shopCard == null }
-                if (availableFoundations.isEmpty()) {
-                    Text("所有地基已放置店铺", color = MaterialTheme.colorScheme.error)
-                } else {
-                    Text("选择地基:", fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    // 与 PlayerPanel 中 FoundationSlots 风格一致的地基选择
-                    Column {
-                        for (row in 0..1) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                for (col in 0..3) {
-                                    val gridIndex = row * 4 + col
-                                    val foundation = player.foundations.getOrNull(gridIndex)
-                                    if (foundation == null) continue
-                                    val hasShop = foundation.shopCard != null
-                                    val isSelected = selectedFoundation == foundation.index
-                                    val isAvailable = !hasShop
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(68.dp)
-                                            .background(
-                                                if (isSelected) GoldHighlight.copy(alpha = 0.4f)
-                                                else FoundationEmpty,
-                                                RoundedCornerShape(8.dp)
-                                            )
-                                            .border(
-                                                width = if (isSelected) 2.dp else 1.dp,
-                                                color = if (isSelected) GoldHighlight else Color.Gray,
-                                                shape = RoundedCornerShape(8.dp)
-                                            )
-                                            .clickable(enabled = isAvailable) { selectedFoundation = foundation.index },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(
-                                                "#${foundation.index + 1}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                            if (hasShop) {
-                                                Text(
-                                                    "已占用",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.error
+                // Option B: Place Shop (互斥：放置店铺后不能再买菜单，反之亦然)
+                val canPlaceShop = !menuBoughtThisTurn && !shopPlacedThisTurn
+                Button(
+                    onClick = { selectedMode = "shop"; selectedFoundation = -1 },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canPlaceShop,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedMode == "shop" && canPlaceShop)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Text(
+                        when {
+                            shopPlacedThisTurn -> "购买店铺牌 (本回合已放置)"
+                            menuBoughtThisTurn -> "购买店铺牌 (已购买菜单，不可放置)"
+                            else -> "购买店铺牌"
+                        },
+                        color = Color.Black
+                    )
+                }
+
+                if (selectedMode == "shop" && canPlaceShop) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("第一步：放置店铺牌（仅支付清理地基费用，一回合一次）", fontWeight = FontWeight.Bold)
+
+                    // Select foundation first - show all foundations, disable those with shops
+                    val availableFoundations = player.foundations.filter { it.shopCard == null }
+                    if (availableFoundations.isEmpty()) {
+                        Text("所有地基已放置店铺", color = MaterialTheme.colorScheme.error)
+                    } else {
+                        Text("选择地基:", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        // 与 PlayerPanel 中 FoundationSlots 风格一致的地基选择
+                        Column {
+                            for (row in 0..1) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    for (col in 0..3) {
+                                        val gridIndex = row * 4 + col
+                                        val foundation = player.foundations.getOrNull(gridIndex)
+                                        if (foundation == null) continue
+                                        val hasShop = foundation.shopCard != null
+                                        val isSelected = selectedFoundation == foundation.index
+                                        val isAvailable = !hasShop
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(68.dp)
+                                                .background(
+                                                    if (isSelected) GoldHighlight.copy(alpha = 0.4f)
+                                                    else FoundationEmpty,
+                                                    RoundedCornerShape(8.dp)
                                                 )
-                                            } else {
-                                                Text(
-                                                    "清理${foundation.clearCost}两",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.Gray
+                                                .border(
+                                                    width = if (isSelected) 2.dp else 1.dp,
+                                                    color = if (isSelected) GoldHighlight else Color.Gray,
+                                                    shape = RoundedCornerShape(8.dp)
                                                 )
+                                                .clickable(enabled = isAvailable) { selectedFoundation = foundation.index },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(
+                                                    "#${foundation.index + 1}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                                if (hasShop) {
+                                                    Text(
+                                                        "已占用",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.error
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        "清理${foundation.clearCost}两",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = Color.Gray
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -209,14 +225,65 @@ fun BuyPhasePanel(
                             }
                         }
                     }
+
+                    if (selectedFoundation >= 0) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("选择店铺:", fontWeight = FontWeight.Bold)
+                        shopPool.available.forEach { shop ->
+                            val clearCost = player.foundations[selectedFoundation].clearCost
+                            val canAfford = player.funds >= clearCost
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = shop.name,
+                                    color = Color.Blue,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { showShopDetail = shop },
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "清理费${clearCost}两 + 建房${shop.buildCost}两",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Button(
+                                    onClick = {
+                                        onPlaceShop(shop, selectedFoundation)
+                                        selectedFoundation = -1
+                                    },
+                                    enabled = canAfford
+                                ) {
+                                    Text("放置")
+                                }
+                            }
+                        }
+                    }
                 }
 
-                if (selectedFoundation >= 0) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("选择店铺:", fontWeight = FontWeight.Bold)
-                    shopPool.available.forEach { shop ->
-                        val clearCost = player.foundations[selectedFoundation].clearCost
-                        val canAfford = player.funds >= clearCost
+                Spacer(Modifier.height(8.dp))
+
+                // Option C: Build House (Step 2 - 支付店铺价格购买房屋，不限次数)
+                val placedUnbuiltShops = player.foundations.filter { it.shopCard != null && !it.isBuilt }
+                if (placedUnbuiltShops.isEmpty()) {
+                    // 无可建造房屋时，若已购买过菜单或店铺，直接提示进入下一阶段
+                    if (menuBoughtThisTurn || shopPlacedThisTurn) {
+                        Text("无可建造的房屋，请进入下一阶段", color = MaterialTheme.colorScheme.outline)
+                    }
+                } else {
+                    Text("购买店铺房屋（支付店铺价格，不限次数，购买后效果生效）", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    placedUnbuiltShops.forEach { foundation ->
+                        val shop = foundation.shopCard!!
+                        val canAfford = player.funds >= shop.buildCost
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -225,88 +292,37 @@ fun BuyPhasePanel(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = shop.name,
-                                color = Color.Blue,
+                                text = "${shop.name} (#${foundation.index + 1}号地)",
                                 style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { showShopDetail = shop },
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
+                                modifier = Modifier.weight(1f)
                             )
                             Text(
-                                text = "清理费${clearCost}两 + 建房${shop.buildCost}两",
+                                text = "建房${shop.buildCost}两",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Button(
-                                onClick = {
-                                    onPlaceShop(shop, selectedFoundation)
-                                    selectedFoundation = -1
-                                },
+                                onClick = { onBuildHouse(foundation.index) },
                                 enabled = canAfford
                             ) {
-                                Text("放置")
+                                Text("建房")
                             }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
                 }
-            }
 
-            Spacer(Modifier.height(8.dp))
-
-            // Option C: Build House (Step 2 - 支付店铺价格购买房屋，不限次数)
-            val placedUnbuiltShops = player.foundations.filter { it.shopCard != null && !it.isBuilt }
-            if (placedUnbuiltShops.isEmpty()) {
-                // 无可建造房屋时，若已购买过菜单或店铺，直接提示进入下一阶段
-                if (menuBoughtThisTurn || shopPlacedThisTurn) {
-                    Text("无可建造的房屋，请进入下一阶段", color = MaterialTheme.colorScheme.outline)
+                // Skip to next phase (Prepare Phase)
+                Button(
+                    onClick = onEndPhase,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("跳过购买，进入备菜阶段")
                 }
-            } else {
-                Text("购买店铺房屋（支付店铺价格，不限次数，购买后效果生效）", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(4.dp))
-                placedUnbuiltShops.forEach { foundation ->
-                    val shop = foundation.shopCard!!
-                    val canAfford = player.funds >= shop.buildCost
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${shop.name} (#${foundation.index + 1}号地)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "建房${shop.buildCost}两",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Button(
-                            onClick = { onBuildHouse(foundation.index) },
-                            enabled = canAfford
-                        ) {
-                            Text("建房")
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-
-            // Skip to next phase (Prepare Phase)
-            Button(
-                onClick = onEndPhase,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
-            ) {
-                Text("跳过购买，进入备菜阶段")
             }
         }
     }

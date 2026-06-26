@@ -19,6 +19,18 @@ class GameViewModel @Inject constructor(
 
     val gameState: StateFlow<GameState?> = gameEngine.gameState
 
+    /** 是否为联机模式 */
+    private val _isOnlineMode = MutableStateFlow(false)
+    val isOnlineMode: StateFlow<Boolean> = _isOnlineMode.asStateFlow()
+
+    /** 联机模式下，是否轮到本地玩家操作 */
+    private val _isMyTurn = MutableStateFlow(true)
+    val isMyTurn: StateFlow<Boolean> = _isMyTurn.asStateFlow()
+
+    /** 联机模式下，等待其他玩家操作的提示文本 */
+    private val _waitingMessage = MutableStateFlow("")
+    val waitingMessage: StateFlow<String> = _waitingMessage.asStateFlow()
+
     private val _showTurnTransition = MutableStateFlow(false)
     val showTurnTransition: StateFlow<Boolean> = _showTurnTransition.asStateFlow()
 
@@ -34,53 +46,149 @@ class GameViewModel @Inject constructor(
     private val _menKeLuoQueShops = MutableStateFlow<List<Foundation>>(emptyList())
     val menKeLuoQueShops: StateFlow<List<Foundation>> = _menKeLuoQueShops.asStateFlow()
 
+    /** 回合切换后，弹窗提醒新玩家“该我操作了” */
+    private val _showMyTurnReminder = MutableStateFlow(false)
+    val showMyTurnReminder: StateFlow<Boolean> = _showMyTurnReminder.asStateFlow()
+
     fun initGame(playerCount: Int, playerNames: List<String> = emptyList()) {
         viewModelScope.launch {
-            // 联机模式：优先使用传入的玩家名称，否则从 OnlineManager 获取
-            val names = if (playerNames.isNotEmpty()) {
-                playerNames
-            } else {
-                val room = OnlineManager.roomFlow.value
-                if (room != null && room.status == RoomStatus.PLAYING) {
+            // 检测是否为联机模式
+            val room = OnlineManager.roomFlow.value
+            val online = room != null && room.status == RoomStatus.PLAYING
+            _isOnlineMode.value = online
+
+            if (online) {
+                // 联机模式：从房间数据获取玩家名称
+                val names = if (playerNames.isNotEmpty()) {
+                    playerNames
+                } else if (room != null) {
                     room.playerIds.map { id ->
                         room.playerNames[id] ?: "玩家${room.playerIds.indexOf(id) + 1}"
                     }
                 } else {
                     emptyList()
                 }
+                gameEngine.initGame(playerCount, names)
+
+                // 房主发布初始游戏状态到服务器
+                if (room?.ownerId == OnlineManager.playerId.value) {
+                    val state = gameEngine.gameState.value ?: return@launch
+                    OnlineManager.publishInitialGameState(state)
+                }
+
+                // 启动联机同步监听
+                startOnlineSync()
+            } else {
+                // 单机模式：正常初始化
+                gameEngine.initGame(playerCount, playerNames)
             }
-            gameEngine.initGame(playerCount, names)
+
+            // 更新回合归属
+            updateMyTurnState()
         }
     }
 
+    /**
+     * 启动联机同步：监听服务器推送的游戏状态更新。
+     * 非当前回合玩家通过此机制接收其他玩家的操作并刷新 UI。
+     */
+    private fun startOnlineSync() {
+        viewModelScope.launch {
+            OnlineManager.syncedGameState.collect { remoteState ->
+                if (remoteState == null) return@collect
+                // 如果服务端版本比本地新，应用远程状态
+                val localState = gameEngine.gameState.value
+                if (localState == null || remoteState.stateVersion > localState.stateVersion) {
+                    gameEngine.applyRemoteState(remoteState)
+                    updateMyTurnState()
+                }
+            }
+        }
+    }
+
+    /**
+     * 更新当前回合归属状态。
+     */
+    private fun updateMyTurnState() {
+        val state = gameEngine.gameState.value ?: return
+        val myTurn = OnlineManager.isMyTurn(state)
+        val prevMyTurn = _isMyTurn.value
+        _isMyTurn.value = myTurn
+
+        // 联机模式：回合刚从其他玩家切换到我 → 弹窗提醒
+        if (_isOnlineMode.value && !prevMyTurn && myTurn) {
+            _showMyTurnReminder.value = true
+        }
+
+        if (!myTurn && _isOnlineMode.value) {
+            val currentPlayer = state.currentPlayer
+            _waitingMessage.value = "等待 ${currentPlayer.name} 操作中……"
+        } else {
+            _waitingMessage.value = ""
+        }
+    }
+
+    /**
+     * 联机模式下，操作后推送状态到服务器。
+     */
+    private fun syncToServerIfOnline() {
+        if (!_isOnlineMode.value) return
+        val state = gameEngine.gameState.value ?: return
+        viewModelScope.launch {
+            OnlineManager.publishGameState(state)
+        }
+    }
+
+    // ========== 阶段1：购买阶段 ==========
+
     fun buyMenuCard(playerId: Int, card: MenuCard) {
         gameEngine.buyMenuCard(playerId, card)
+        updateMyTurnState()
+        syncToServerIfOnline()
     }
 
     fun placeShopCard(playerId: Int, shop: ShopCard, foundationIndex: Int) {
         gameEngine.placeShopCard(playerId, shop, foundationIndex)
+        updateMyTurnState()
+        syncToServerIfOnline()
     }
 
     fun buildShopHouse(playerId: Int, foundationIndex: Int) {
         gameEngine.buildShopHouse(playerId, foundationIndex)
+        updateMyTurnState()
+        syncToServerIfOnline()
     }
 
     fun endBuyPhase(playerId: Int) {
         gameEngine.endBuyPhase(playerId)
+        updateMyTurnState()
+        syncToServerIfOnline()
     }
+
+    // ========== 阶段2：备菜阶段 ==========
 
     fun removeMenu(playerId: Int, card: MenuCard) {
         gameEngine.removeMenu(playerId, card)
+        updateMyTurnState()
+        syncToServerIfOnline()
     }
 
     fun skipPreparePhase() {
         gameEngine.skipPreparePhase()
+        updateMyTurnState()
+        syncToServerIfOnline()
     }
+
+    // ========== 阶段3：招待阶段 ==========
 
     fun selectGuest(playerId: Int, queuePosition: Int) {
         gameEngine.selectGuest(playerId, queuePosition)
+        updateMyTurnState()
+        syncToServerIfOnline()
 
         val menuResult = gameEngine.settleMenuIncome(playerId)
+        updateMyTurnState()
+        syncToServerIfOnline()
 
         val state = gameState.value
         // 门可罗雀：需要让玩家选择一个店铺结算
@@ -90,7 +198,8 @@ class GameViewModel @Inject constructor(
                 // 没有可结算的店铺，直接跳过
                 val shopResult = gameEngine.settleShopIncome(playerId)
                 completeSettlement(menuResult, shopResult)
-                // refreshGuestQueue 推迟到 dismissSettlement 中执行
+                updateMyTurnState()
+                syncToServerIfOnline()
             } else {
                 _menKeLuoQueShops.value = shops
                 _showMenKeLuoQueDialog.value = true
@@ -100,7 +209,8 @@ class GameViewModel @Inject constructor(
         } else {
             val shopResult = gameEngine.settleShopIncome(playerId)
             completeSettlement(menuResult, shopResult)
-            // refreshGuestQueue 推迟到 dismissSettlement 中执行
+            updateMyTurnState()
+            syncToServerIfOnline()
         }
     }
 
@@ -113,10 +223,12 @@ class GameViewModel @Inject constructor(
 
         val shopResult = gameEngine.settleShopIncome(playerId, selectedShopIndex = foundationIndex)
         completeSettlement(menuResult, shopResult)
-        // refreshGuestQueue 推迟到 dismissSettlement 中执行
 
         _pendingMenuResult = null
         _showMenKeLuoQueDialog.value = false
+
+        updateMyTurnState()
+        syncToServerIfOnline()
     }
 
     private fun completeSettlement(menuResult: MenuSettlementResult, shopResult: ShopSettlementResult) {
@@ -137,18 +249,22 @@ class GameViewModel @Inject constructor(
     fun dismissSettlement() {
         _settlementResult.value = null
         gameEngine.refreshGuestQueue()
+        updateMyTurnState()
+        syncToServerIfOnline()
         proceedAfterRefresh()
     }
 
     fun confirmEventAnnouncement() {
         gameEngine.confirmEventAnnouncement()
+        updateMyTurnState()
+        syncToServerIfOnline()
         proceedAfterRefresh()
     }
 
     /**
      * 翻牌后的统一后续处理：
      * - 如果有事件待公告 → 等 UI 弹出 EventAnnouncementDialog
-     * - 如果没有事件 → 检查胜负 → 显示回合切换弹窗
+     * - 如果没有事件 → 检查胜负 → 切换回合
      */
     private fun proceedAfterRefresh() {
         val state = gameState.value ?: return
@@ -160,15 +276,42 @@ class GameViewModel @Inject constructor(
         val winChecker = WinConditionChecker()
         if (winChecker.checkWin(state.currentPlayer)) {
             _winner.value = state.currentPlayer.name
+            syncToServerIfOnline()
             return
         }
-        _showTurnTransition.value = true
+        // 联机模式：直接切换回合并同步；单机模式：显示回合切换弹窗
+        if (_isOnlineMode.value) {
+            performOnlineTurnEnd()
+        } else {
+            _showTurnTransition.value = true
+        }
     }
 
+    /**
+     * 联机模式：结算完成后自动切换回合并推送到服务器。
+     */
+    private fun performOnlineTurnEnd() {
+        _settlementResult.value = null
+        gameEngine.endTurn()
+        updateMyTurnState()
+        syncToServerIfOnline()
+    }
+
+    /**
+     * 单机模式：回合切换确认。
+     */
     fun confirmTurnTransition() {
         _showTurnTransition.value = false
         _settlementResult.value = null
         gameEngine.endTurn()
+        updateMyTurnState()
+        // 单机模式：回合切换后提醒新玩家
+        _showMyTurnReminder.value = true
+    }
+
+    /** 关闭“该我操作了”提醒弹窗 */
+    fun dismissMyTurnReminder() {
+        _showMyTurnReminder.value = false
     }
 }
 

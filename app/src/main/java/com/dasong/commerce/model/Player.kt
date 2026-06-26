@@ -2,7 +2,9 @@ package com.dasong.commerce.model
 
 import com.dasong.commerce.model.card.MenuCard
 import com.dasong.commerce.model.card.ShopCard
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class Foundation(
     val index: Int,
     var shopCard: ShopCard? = null,
@@ -22,6 +24,7 @@ data class Foundation(
     }
 }
 
+@Serializable
 data class PlayerState(
     val id: Int,
     val name: String,
@@ -35,6 +38,7 @@ data class PlayerState(
     val canPrepare: Boolean get() = totalMenuCards > 6
 }
 
+@Serializable
 data class MenuPool(
     val gradeOne: MutableList<MenuCard> = mutableListOf(),
     val gradeTwo: MutableList<MenuCard> = mutableListOf(),
@@ -51,6 +55,7 @@ data class MenuPool(
     val totalSize: Int get() = gradeOne.size + gradeTwo.size + gradeThree.size + gradeFour.size
 }
 
+@Serializable
 data class ShopPool(
     val available: MutableList<ShopCard> = mutableListOf()
 )
