@@ -3,6 +3,8 @@ package com.dasong.commerce.ui.game
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -16,6 +18,7 @@ import com.dasong.commerce.ui.game.components.phase.PhaseIndicator
 import com.dasong.commerce.ui.game.components.player.PlayerPanelsRow
 import com.dasong.commerce.ui.game.components.public.EventCardDisplay
 import com.dasong.commerce.ui.game.components.public.PublicAreaPanel
+import com.dasong.commerce.ui.game.components.settlement.DiceRollAnimationDialog
 import com.dasong.commerce.ui.game.components.settlement.SettlementDialog
 import com.dasong.commerce.engine.GameState
 import com.dasong.commerce.engine.WinConditionChecker
@@ -28,6 +31,7 @@ fun GameScreen(
     playerCount: Int,
     playerNames: List<String> = emptyList(),
     onGameEnd: (String) -> Unit,
+    onBackToHome: () -> Unit = {},
     viewModel: GameViewModel = hiltViewModel()
 ) {
     val gameState by viewModel.gameState.collectAsStateWithLifecycle()
@@ -40,6 +44,13 @@ fun GameScreen(
     val isMyTurn by viewModel.isMyTurn.collectAsStateWithLifecycle()
     val waitingMessage by viewModel.waitingMessage.collectAsStateWithLifecycle()
     val showMyTurnReminder by viewModel.showMyTurnReminder.collectAsStateWithLifecycle()
+    val showDiceRoll by viewModel.showDiceRoll.collectAsStateWithLifecycle()
+    val pendingDiceCount by viewModel.pendingDiceCount.collectAsStateWithLifecycle()
+    val diceSources by viewModel.diceSources.collectAsStateWithLifecycle()
+    val shouldExitToHome by viewModel.shouldExitToHome.collectAsStateWithLifecycle()
+    val disbandMessage by viewModel.disbandMessage.collectAsStateWithLifecycle()
+
+    var showExitConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(playerCount) {
         viewModel.initGame(playerCount, playerNames)
@@ -49,12 +60,23 @@ fun GameScreen(
         winner?.let { onGameEnd(it) }
     }
 
+    LaunchedEffect(shouldExitToHome) {
+        if (shouldExitToHome) {
+            onBackToHome()
+        }
+    }
+
     val currentState = gameState ?: return
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = { showExitConfirm = true }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        }
+                    },
                     title = {
                         Column {
                             Text(
@@ -110,6 +132,17 @@ fun GameScreen(
             // 联机模式下，仅当前回合玩家显示交互弹窗
             val showPlayerDialogs = !isOnlineMode || isMyTurn
 
+            // Dice Roll Animation Dialog — 骰子投掷交互
+            if (showPlayerDialogs && showDiceRoll && pendingDiceCount > 0) {
+                DiceRollAnimationDialog(
+                    diceCount = pendingDiceCount,
+                    diceSources = diceSources,
+                    onRollComplete = { diceValues ->
+                        viewModel.onDiceRollComplete(diceValues)
+                    }
+                )
+            }
+
             // Settlement Dialog
             if (showPlayerDialogs) {
                 settlementResult?.let { result ->
@@ -158,6 +191,26 @@ fun GameScreen(
                     onSelect = { foundationIndex ->
                         viewModel.onMenKeLuoQueShopSelected(foundationIndex)
                     }
+                )
+            }
+
+            // 退出确认弹窗
+            if (showExitConfirm) {
+                ExitConfirmDialog(
+                    isOnlineMode = isOnlineMode,
+                    onConfirm = {
+                        showExitConfirm = false
+                        viewModel.exitGame()
+                    },
+                    onDismiss = { showExitConfirm = false }
+                )
+            }
+
+            // 游戏解散提示弹窗（联机模式其他玩家退出时触发）
+            disbandMessage?.let { message ->
+                GameDisbandedDialog(
+                    message = message,
+                    onConfirm = { viewModel.dismissDisbandMessage() }
                 )
             }
         }
@@ -369,5 +422,63 @@ fun MenKeLuoQueDialog(
             }
         },
         confirmButton = {} // 不显示确认按钮，由各店铺的选择按钮代替
+    )
+}
+
+@Composable
+fun ExitConfirmDialog(
+    isOnlineMode: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("退出游戏") },
+        text = {
+            Text(
+                if (isOnlineMode)
+                    "确定要退出游戏吗？退出后本局游戏将解散，其他玩家也会被强制退出。"
+                else
+                    "确定要退出游戏吗？游戏进度将不会保存。"
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("退出")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+fun GameDisbandedDialog(
+    message: String,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = {
+            Text(
+                "游戏已解散",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        },
+        text = { Text(message) },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("返回主页")
+            }
+        }
     )
 }

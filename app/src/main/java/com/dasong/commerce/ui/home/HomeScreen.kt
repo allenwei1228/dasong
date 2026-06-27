@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,7 +63,8 @@ fun HomeScreen(
         MenuButton(
             text = "游戏说明",
             icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
-            onClick = onGuide
+            onClick = onGuide,
+            color = SongInk
         )
 
         Spacer(Modifier.height(16.dp))
@@ -71,29 +73,26 @@ fun HomeScreen(
             text = "单机游戏",
             icon = { Icon(Icons.Default.Gamepad, contentDescription = null) },
             onClick = onStartGame,
-            isPrimary = true
+            color = SongGold
         )
 
         Spacer(Modifier.height(16.dp))
 
         MenuButton(
-            text = "创建房间",
-            icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            onClick = onCreateRoom,
-            enabled = true
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        MenuButton(
-            text = "加入房间",
+            text = "联机游戏",
             icon = { Icon(Icons.Default.Link, contentDescription = null) },
             onClick = onJoinRoom,
-            enabled = true
+            color = SongRed
         )
 
         Spacer(Modifier.height(48.dp))
+        Text(
+            text = "allenwei 开发",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
 
+        Spacer(Modifier.height(4.dp))
         Text(
             text = "鳐鳐鱼 Yaofish 出品",
             style = MaterialTheme.typography.bodySmall,
@@ -107,7 +106,7 @@ private fun MenuButton(
     text: String,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
-    isPrimary: Boolean = false,
+    color: Color = SongRed,
     enabled: Boolean = true
 ) {
     Button(
@@ -116,17 +115,10 @@ private fun MenuButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp),
-        colors = if (isPrimary) {
-            ButtonDefaults.buttonColors(
-                containerColor = SongRed,
-                contentColor = MaterialTheme.colorScheme.onSecondary
-            )
-        } else {
-            ButtonDefaults.buttonColors(
-                containerColor = SongGold,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            )
-        },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            contentColor = MaterialTheme.colorScheme.onSecondary
+        ),
         shape = MaterialTheme.shapes.medium
     ) {
         icon()

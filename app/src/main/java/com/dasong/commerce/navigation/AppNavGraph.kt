@@ -83,6 +83,11 @@ fun AppNavGraph() {
                     navController.navigate("result/$winnerName") {
                         popUpTo("home") { inclusive = true }
                     }
+                },
+                onBackToHome = {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                    }
                 }
             )
         }
@@ -97,6 +102,11 @@ fun AppNavGraph() {
                 playerNames = emptyList(),
                 onGameEnd = { winnerName ->
                     navController.navigate("result/$winnerName") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                },
+                onBackToHome = {
+                    navController.navigate("home") {
                         popUpTo("home") { inclusive = true }
                     }
                 }

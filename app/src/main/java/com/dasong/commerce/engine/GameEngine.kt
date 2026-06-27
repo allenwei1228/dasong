@@ -2,6 +2,7 @@ package com.dasong.commerce.engine
 
 import com.dasong.commerce.model.*
 import com.dasong.commerce.model.card.*
+import com.dasong.commerce.util.DiceRoller
 import com.dasong.commerce.util.shuffle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,10 +39,14 @@ class GameEngine(
             }
         }
 
-        // Create players with custom names (联机模式) or default names (单机模式)
+        // Create players with randomly assigned seat orders
+        // 玩家顺序随机抽取：打乱名字索引，使 seatOrder 随机分配给各玩家
         val names = if (playerNames.size == playerCount) playerNames else emptyList()
+        val nameIndices = (0 until playerCount).toMutableList()
+        nameIndices.shuffle()
         val players = (1..playerCount).map { i ->
-            val name = names.getOrElse(i - 1) { "玩家$i" }
+            val nameIndex = nameIndices[i - 1]
+            val name = names.getOrElse(nameIndex) { "玩家${nameIndex + 1}" }
             val menuCards = deckManager.getInitialMenuForPlayer()
             PlayerState(
                 id = i,
@@ -186,6 +191,20 @@ class GameEngine(
 
     // ========== 阶段3：招待阶段 ==========
 
+    fun estimateDiceCount(playerId: Int): Int {
+        val state = requireState()
+        val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
+        val guest = state.selectedGuest ?: error("未选择客人")
+        return settlementEngine.estimateDiceCount(player, guest, state.activeEvent)
+    }
+
+    fun getDiceSources(playerId: Int): List<String> {
+        val state = requireState()
+        val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
+        val guest = state.selectedGuest ?: error("未选择客人")
+        return settlementEngine.getDiceSources(player, guest, state.activeEvent)
+    }
+
     fun selectGuest(playerId: Int, queuePosition: Int) {
         val state = requireState()
         val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
@@ -219,7 +238,7 @@ class GameEngine(
         _gameState.value = state.copy(stateVersion = state.stateVersion + 1)
     }
 
-    fun settleMenuIncome(playerId: Int): MenuSettlementResult {
+    fun settleMenuIncome(playerId: Int, diceRoller: () -> Int = { DiceRoller.roll() }): MenuSettlementResult {
         val state = requireState()
         val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
         val guest = state.selectedGuest ?: error("未选择客人")
@@ -227,7 +246,8 @@ class GameEngine(
         val result = settlementEngine.calculateMenuIncome(
             player = player,
             guest = guest,
-            event = state.activeEvent
+            event = state.activeEvent,
+            diceRoller = diceRoller
         )
 
         state.settlementMenuIncome = result.totalIncome
@@ -237,7 +257,7 @@ class GameEngine(
         return result
     }
 
-    fun settleShopIncome(playerId: Int, selectedShopIndex: Int? = null): ShopSettlementResult {
+    fun settleShopIncome(playerId: Int, selectedShopIndex: Int? = null, diceRoller: () -> Int = { DiceRoller.roll() }): ShopSettlementResult {
         val state = requireState()
         val player = state.players.find { it.id == playerId } ?: error("玩家不存在")
         val guest = state.selectedGuest ?: error("未选择客人")
@@ -246,7 +266,8 @@ class GameEngine(
             player = player,
             guest = guest,
             event = state.activeEvent,
-            selectedShopIndex = selectedShopIndex
+            selectedShopIndex = selectedShopIndex,
+            diceRoller = diceRoller
         )
 
         state.settlementShopIncome = result.totalIncome

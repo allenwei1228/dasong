@@ -196,7 +196,9 @@ fun BuyPhasePanel(
                                                     color = if (isSelected) GoldHighlight else Color.Gray,
                                                     shape = RoundedCornerShape(8.dp)
                                                 )
-                                                .clickable(enabled = isAvailable) { selectedFoundation = foundation.index },
+                                                .clickable(enabled = isAvailable) {
+                                                    selectedFoundation = foundation.index
+                                                },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -240,7 +242,7 @@ fun BuyPhasePanel(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = shop.name,
+                                    text = "${shop.name} ${shop.type.emoji}",
                                     color = Color.Blue,
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier
@@ -292,7 +294,7 @@ fun BuyPhasePanel(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "${shop.name} (#${foundation.index + 1}号地)",
+                                text = "${shop.name} ${shop.type.emoji} (#${foundation.index + 1}号地)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f)
                             )

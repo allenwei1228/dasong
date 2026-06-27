@@ -7,6 +7,7 @@ import com.dasong.commerce.model.*
 import com.dasong.commerce.model.card.*
 import com.dasong.commerce.online.OnlineManager
 import com.dasong.commerce.online.RoomStatus
+import com.dasong.commerce.util.DiceRoller
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -46,9 +47,36 @@ class GameViewModel @Inject constructor(
     private val _menKeLuoQueShops = MutableStateFlow<List<Foundation>>(emptyList())
     val menKeLuoQueShops: StateFlow<List<Foundation>> = _menKeLuoQueShops.asStateFlow()
 
-    /** 回合切换后，弹窗提醒新玩家“该我操作了” */
+    /** 回合切换后，弹窗提醒新玩家"该我操作了" */
     private val _showMyTurnReminder = MutableStateFlow(false)
     val showMyTurnReminder: StateFlow<Boolean> = _showMyTurnReminder.asStateFlow()
+
+    /** 骰子投掷弹窗 */
+    private val _showDiceRoll = MutableStateFlow(false)
+    val showDiceRoll: StateFlow<Boolean> = _showDiceRoll.asStateFlow()
+
+    /** 当前等待投掷的骰子数量 */
+    private val _pendingDiceCount = MutableStateFlow(0)
+    val pendingDiceCount: StateFlow<Int> = _pendingDiceCount.asStateFlow()
+
+    /** 骰子来源说明（一品菜单/卦肆） */
+    private val _diceSources = MutableStateFlow<List<String>>(emptyList())
+    val diceSources: StateFlow<List<String>> = _diceSources.asStateFlow()
+
+    /** 暂存当前玩家的操作上下文（用于骰子完成后继续结算） */
+    private var _pendingPlayerId: Int = -1
+    private var _pendingMenuResult: MenuSettlementResult? = null
+
+    /** 是否应该退出到主页 */
+    private val _shouldExitToHome = MutableStateFlow(false)
+    val shouldExitToHome: StateFlow<Boolean> = _shouldExitToHome.asStateFlow()
+
+    /** 游戏被解散的提示消息（联机模式下其他玩家退出时触发） */
+    private val _disbandMessage = MutableStateFlow<String?>(null)
+    val disbandMessage: StateFlow<String?> = _disbandMessage.asStateFlow()
+
+    /** 标记是否是自己主动退出的（避免自己也弹出解散提示） */
+    private var _isExitingSelf = false
 
     fun initGame(playerCount: Int, playerNames: List<String> = emptyList()) {
         viewModelScope.launch {
@@ -101,6 +129,14 @@ class GameViewModel @Inject constructor(
                 if (localState == null || remoteState.stateVersion > localState.stateVersion) {
                     gameEngine.applyRemoteState(remoteState)
                     updateMyTurnState()
+                }
+            }
+        }
+        // 监听房间状态变化：检测游戏解散
+        viewModelScope.launch {
+            OnlineManager.roomFlow.collect { room ->
+                if (room?.status == RoomStatus.FINISHED && _isOnlineMode.value && !_isExitingSelf) {
+                    _disbandMessage.value = "有玩家退出了游戏，本局已解散。"
                 }
             }
         }
@@ -186,7 +222,48 @@ class GameViewModel @Inject constructor(
         updateMyTurnState()
         syncToServerIfOnline()
 
-        val menuResult = gameEngine.settleMenuIncome(playerId)
+        // 检查是否需要骰子交互
+        val diceCount = gameEngine.estimateDiceCount(playerId)
+        _pendingPlayerId = playerId
+
+        if (diceCount > 0) {
+            // 需要骰子交互：弹出骰子投掷弹窗，等玩家投完后继续
+            _pendingDiceCount.value = diceCount
+            _diceSources.value = gameEngine.getDiceSources(playerId)
+            _showDiceRoll.value = true
+        } else {
+            // 无需骰子，直接结算
+            proceedWithSettlement(playerId, emptyList())
+        }
+    }
+
+    /**
+     * 骰子投掷完成后调用，使用投掷结果继续结算。
+     */
+    fun onDiceRollComplete(diceValues: List<Int>) {
+        _showDiceRoll.value = false
+        val playerId = _pendingPlayerId
+        _pendingPlayerId = -1
+        if (playerId < 0) return
+
+        proceedWithSettlement(playerId, diceValues)
+    }
+
+    /**
+     * 继续结算流程：用骰子结果创建临时 roller，然后按顺序结算菜单和店铺。
+     */
+    private fun proceedWithSettlement(playerId: Int, diceValues: List<Int>) {
+        // 创建骰子队列：按顺序消费值
+        var diceIndex = 0
+        val diceRoller: () -> Int = {
+            if (diceIndex < diceValues.size) {
+                diceValues[diceIndex++]
+            } else {
+                DiceRoller.roll() // fallback
+            }
+        }
+
+        val menuResult = gameEngine.settleMenuIncome(playerId, diceRoller)
         updateMyTurnState()
         syncToServerIfOnline()
 
@@ -196,35 +273,43 @@ class GameViewModel @Inject constructor(
             val shops = gameEngine.getMenKeLuoQueShops(playerId)
             if (shops.isEmpty()) {
                 // 没有可结算的店铺，直接跳过
-                val shopResult = gameEngine.settleShopIncome(playerId)
+                val shopResult = gameEngine.settleShopIncome(playerId, diceRoller = diceRoller)
                 completeSettlement(menuResult, shopResult)
                 updateMyTurnState()
                 syncToServerIfOnline()
             } else {
                 _menKeLuoQueShops.value = shops
                 _showMenKeLuoQueDialog.value = true
-                // 暂存 menuResult 用于后续完成结算
+                // 暂存 menuResult 和 diceRoller 用于后续完成结算
                 _pendingMenuResult = menuResult
+                _pendingDiceRoller = diceRoller
             }
         } else {
-            val shopResult = gameEngine.settleShopIncome(playerId)
+            val shopResult = gameEngine.settleShopIncome(playerId, diceRoller = diceRoller)
             completeSettlement(menuResult, shopResult)
             updateMyTurnState()
             syncToServerIfOnline()
         }
     }
 
-    private var _pendingMenuResult: MenuSettlementResult? = null
+    /** 暂存骰子 roller（门可罗雀场景传递用） */
+    private var _pendingDiceRoller: (() -> Int)? = null
 
     fun onMenKeLuoQueShopSelected(foundationIndex: Int) {
         val state = gameState.value ?: return
         val playerId = state.currentPlayer.id
         val menuResult = _pendingMenuResult ?: return
+        val diceRoller = _pendingDiceRoller ?: { DiceRoller.roll() }
 
-        val shopResult = gameEngine.settleShopIncome(playerId, selectedShopIndex = foundationIndex)
+        val shopResult = gameEngine.settleShopIncome(
+            playerId,
+            selectedShopIndex = foundationIndex,
+            diceRoller = diceRoller
+        )
         completeSettlement(menuResult, shopResult)
 
         _pendingMenuResult = null
+        _pendingDiceRoller = null
         _showMenKeLuoQueDialog.value = false
 
         updateMyTurnState()
@@ -309,9 +394,26 @@ class GameViewModel @Inject constructor(
         _showMyTurnReminder.value = true
     }
 
-    /** 关闭“该我操作了”提醒弹窗 */
+    /** 关闭"该我操作了"提醒弹窗 */
     fun dismissMyTurnReminder() {
         _showMyTurnReminder.value = false
+    }
+
+    /** 退出游戏：联机模式下解散房间，单机模式直接退出 */
+    fun exitGame() {
+        viewModelScope.launch {
+            if (_isOnlineMode.value) {
+                _isExitingSelf = true
+                OnlineManager.disbandGame()
+            }
+            _shouldExitToHome.value = true
+        }
+    }
+
+    /** 关闭解散提示弹窗，导航回主页 */
+    fun dismissDisbandMessage() {
+        _disbandMessage.value = null
+        _shouldExitToHome.value = true
     }
 }
 

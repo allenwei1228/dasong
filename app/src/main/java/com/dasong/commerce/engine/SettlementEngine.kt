@@ -41,6 +41,93 @@ data class ShopSettlementResult(
 class SettlementEngine {
 
     /**
+     * Estimate the maximum number of dice needed for this settlement.
+     * - 一品菜: max possible count from refined chamber + kitchen
+     * - 卦肆: count of visited GUA_SI shops
+     */
+    fun estimateDiceCount(
+        player: PlayerState,
+        guest: GuestCard,
+        event: EventCard?
+    ): Int {
+        var menuCount = guest.menuConsumption
+        when (event?.effect) {
+            EventEffect.JIAN_YI_YANG_DE -> menuCount = (menuCount - 1).coerceAtLeast(0)
+            EventEffect.SHI_HE_NIAN_FENG -> menuCount += 1
+            else -> {}
+        }
+
+        val builtShops = player.foundations.filter { it.hasModel && it.shopCard != null && it.isBuilt }
+        val cuJuCount = builtShops.count { it.shopCard?.type == ShopType.CU_JU }
+        val guestShopTypes = guest.shopTypes
+        val effectiveCuJuBonus = if (guestShopTypes.any { it == ShopType.CU_JU }) cuJuCount * 2 else 0
+        menuCount += effectiveCuJuBonus
+
+        // Max 一品 cards that could be drawn (only from refined chamber, kitchen not in play yet)
+        val yiPinCount = player.refinedChamber.count { it.grade == MenuGrade.ONE }
+        val menuDiceCount = minOf(menuCount, yiPinCount)
+
+        // 卦肆 shops that will be visited
+        val visitedShops = builtShops.filter {
+            it.shopCard!!.type in guestShopTypes && it.shopCard!!.type != ShopType.CU_JU
+        }
+        var effectiveVisited = visitedShops
+        if (event?.effect == EventEffect.MEN_KE_LUO_QUE && visitedShops.isNotEmpty()) {
+            effectiveVisited = listOf(visitedShops.first())
+        }
+        val guaSiCount = effectiveVisited.count { it.shopCard?.type == ShopType.GUA_SI }
+
+        return menuDiceCount + guaSiCount
+    }
+
+    /**
+     * Get human-readable descriptions of where the dice come from.
+     * Used by the dice roll UI to explain why the player is rolling.
+     */
+    fun getDiceSources(
+        player: PlayerState,
+        guest: GuestCard,
+        event: EventCard?
+    ): List<String> {
+        val sources = mutableListOf<String>()
+
+        // --- 一品菜单牌骰子 ---
+        var menuCount = guest.menuConsumption
+        when (event?.effect) {
+            EventEffect.JIAN_YI_YANG_DE -> menuCount = (menuCount - 1).coerceAtLeast(0)
+            EventEffect.SHI_HE_NIAN_FENG -> menuCount += 1
+            else -> {}
+        }
+        val builtShops = player.foundations.filter { it.hasModel && it.shopCard != null && it.isBuilt }
+        val cuJuCount = builtShops.count { it.shopCard?.type == ShopType.CU_JU }
+        val guestShopTypes = guest.shopTypes
+        val effectiveCuJuBonus = if (guestShopTypes.any { it == ShopType.CU_JU }) cuJuCount * 2 else 0
+        menuCount += effectiveCuJuBonus
+
+        val yiPinCount = player.refinedChamber.count { it.grade == MenuGrade.ONE }
+        val menuDiceCount = minOf(menuCount, yiPinCount)
+        if (menuDiceCount > 0) {
+            sources.add("一品菜单牌额外收益 ×${menuDiceCount}")
+        }
+
+        // --- 卦肆店铺骰子 ---
+        val visitedShops = builtShops.filter {
+            it.shopCard!!.type in guestShopTypes && it.shopCard!!.type != ShopType.CU_JU
+        }
+        val effectiveVisited = if (event?.effect == EventEffect.MEN_KE_LUO_QUE && visitedShops.isNotEmpty()) {
+            listOf(visitedShops.first())
+        } else {
+            visitedShops
+        }
+        val guaSiCount = effectiveVisited.count { it.shopCard?.type == ShopType.GUA_SI }
+        if (guaSiCount > 0) {
+            sources.add("卦肆店铺骰子收入 ×${guaSiCount}")
+        }
+
+        return sources
+    }
+
+    /**
      * Calculate menu income for a player serving a guest
      */
     fun calculateMenuIncome(
@@ -127,7 +214,8 @@ class SettlementEngine {
         player: PlayerState,
         guest: GuestCard,
         event: EventCard?,
-        selectedShopIndex: Int? = null  // 门可罗雀时玩家选择的店铺foundation index
+        selectedShopIndex: Int? = null,  // 门可罗雀时玩家选择的店铺foundation index
+        diceRoller: () -> Int = { DiceRoller.roll() }
     ): ShopSettlementResult {
         val guestShopTypes = guest.shopTypes
         val builtShops = player.foundations.filter { it.hasModel && it.shopCard != null && it.isBuilt }
@@ -156,7 +244,7 @@ class SettlementEngine {
             val shop = foundation.shopCard!!
             var shopIncome = when (shop.incomeType) {
                 IncomeType.FIXED -> shop.baseIncome
-                IncomeType.DICE -> DiceRoller.roll()
+                IncomeType.DICE -> diceRoller()
                 IncomeType.MENU_BONUS -> guest.menuConsumption + shop.menuBonus
                 IncomeType.HOUSING_COUNT -> builtShops.size
             }

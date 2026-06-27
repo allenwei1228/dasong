@@ -194,6 +194,20 @@ object OnlineManager {
         _events.tryEmit("游戏开始！")
     }
 
+    /**
+     * 解散游戏：将房间状态设为 FINISHED，通知其他玩家。
+     */
+    suspend fun disbandGame() {
+        val room = _roomFlow.value ?: return
+        supabase.from("rooms").update({
+            set("status", "FINISHED")
+        }) {
+            filter { eq("room_code", room.roomCode) }
+        }
+        _roomFlow.value = room.copy(status = RoomStatus.FINISHED)
+        _events.tryEmit("游戏已解散")
+    }
+
     fun resetLocalNavigation() {
         syncJob?.cancel()
         syncJob = null

@@ -2,6 +2,8 @@ package com.dasong.commerce.ui.room
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -14,8 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dasong.commerce.online.OnlineViewModel
@@ -38,6 +43,7 @@ fun RoomScreen(
 
     var maxPlayers by remember { mutableIntStateOf(2) }
     val clipboardManager = LocalClipboardManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     // 监听游戏开始
     LaunchedEffect(shouldNavigateToGame) {
@@ -48,6 +54,7 @@ fun RoomScreen(
     }
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = { Text("联机游戏") },
@@ -79,6 +86,7 @@ fun RoomScreen(
                 placeholder = { Text("输入昵称（默认: 玩家）") },
                 singleLine = true,
                 enabled = room == null,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             )
 
             if (room == null) {
@@ -142,6 +150,13 @@ fun RoomScreen(
                             label = { Text("输入 6 位房间码") },
                             singleLine = true,
                             enabled = !uiState.isLoading,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Ascii,
+                                imeAction = ImeAction.Done,
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { keyboardController?.hide() }
+                            ),
                         )
 
                         Spacer(Modifier.height(12.dp))
