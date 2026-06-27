@@ -6,6 +6,7 @@
     <application
         android:name=".DaSongApp"
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="大宋百商图"
         android:supportsRtl="true"
         android:theme="@style/Theme.DaSongCommerce">

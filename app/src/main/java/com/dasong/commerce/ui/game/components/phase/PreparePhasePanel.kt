@@ -109,7 +109,7 @@ fun PreparePhasePanel(
                                         )
                                     ) {
                                         Text(
-                                            "舍弃 ${gradeToChinese(card.grade)} ${card.name} (${card.baseIncome}收益) — 花费3两"
+                                            "舍弃 ${gradeToChinese(card.grade)} ${card.displayName} (${card.baseIncome}收益) — 花费3两"
                                         )
                                     }
                                     Spacer(Modifier.height(4.dp))

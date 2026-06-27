@@ -7,8 +7,11 @@ data class MenuCard(
     val id: Int,
     val name: String,
     val grade: MenuGrade,
-    val cost: Int
+    val cost: Int,
+    val emoji: String = ""
 ) {
+    val displayName: String get() = if (emoji.isNotEmpty()) "$emoji$name" else name
+
     val baseIncome: Int get() = when (grade) {
         MenuGrade.FOUR -> 1
         MenuGrade.THREE -> 2

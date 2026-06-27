@@ -48,22 +48,22 @@ private fun MenuCardCatalog() {
     ) {
         item {
             Text("一品 · 御宴大餐 (9铜钱, 2+🎲)", fontWeight = FontWeight.Bold)
-            Text("东坡肉、御膳坊、蟹酿橙、佛跳墙", style = MaterialTheme.typography.bodySmall)
+            Text("🦑火爆鱿鱼、🦐金丝虾球、🦀蟹酿橙、🦈鱼翅捞饭", style = MaterialTheme.typography.bodySmall)
         }
         item { Spacer(Modifier.height(8.dp)) }
         item {
             Text("二品 · 酒楼硬菜 (6铜钱, 3固定)", fontWeight = FontWeight.Bold)
-            Text("葱爆羊肉、糖醋里脊、红烧狮子头、松鼠鳜鱼", style = MaterialTheme.typography.bodySmall)
+            Text("🍖葱爆羊肉、🥓椰子鸡、🦆北京烤鸭、🐠松鼠鳜鱼", style = MaterialTheme.typography.bodySmall)
         }
         item { Spacer(Modifier.height(8.dp)) }
         item {
             Text("三品 · 家常菜 (3铜钱, 2固定)", fontWeight = FontWeight.Bold)
-            Text("炒青菜、葱油鸡、红烧鱼、豆腐羹、酱牛肉", style = MaterialTheme.typography.bodySmall)
+            Text("🥬炒青菜、🍗葱油鸡、🐟红烧鱼、🥣豆腐羹、🥩酱牛肉", style = MaterialTheme.typography.bodySmall)
         }
         item { Spacer(Modifier.height(8.dp)) }
         item {
             Text("四品 · 低价小吃 (免费, 2固定)", fontWeight = FontWeight.Bold)
-            Text("炊饼、馒头、馄饨、汤面", style = MaterialTheme.typography.bodySmall)
+            Text("🫓炊饼、🥮月饼、🥟饺子、🍜汤面", style = MaterialTheme.typography.bodySmall)
         }
     }
 }

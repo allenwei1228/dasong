@@ -118,7 +118,7 @@ fun BuyPhasePanel(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("${card.cardGrade(card.grade)}·${card.name} (${pile.size}张)",
+                                Text("${card.cardGrade(card.grade)}·${card.displayName} (${pile.size}张)",
                                     modifier = Modifier.weight(1f, fill = false),
                                     color = Color.Blue)
                                 Button(

@@ -52,12 +52,20 @@ fun ShopCardPool(shopPool: ShopPool) {
                         )
                         .padding(4.dp)
                 ) {
-                    Text(
-                        shop.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
+                    Row {
+                        Text(
+                            shop.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Text(
+                            shop.type.emoji,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
                     Text(
                         "售价${shop.buildCost}两",
                         style = MaterialTheme.typography.labelSmall

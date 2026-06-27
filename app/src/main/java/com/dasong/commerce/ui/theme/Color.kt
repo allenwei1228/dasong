@@ -14,8 +14,8 @@ val MenuGradeTwoColor = Color(0xFFC0C0C0)
 val MenuGradeThreeColor = Color(0xFFCD853F)
 val MenuGradeFourColor = Color(0xFF8B7355)
 
-val FoundationEmpty = Color(0xFFF5F5DC)
-val FoundationOccupied = Color(0xFFD2B48C)
-val FoundationBuilt = Color(0xFF8B4513)
+val FoundationEmpty = Color(0xFFFFFFFF)
+val FoundationOccupied = Color(0xFFF5F5DC)
+val FoundationBuilt = Color(0xFFD2B48C)
 
 val GoldHighlight = Color(0xFFFFD700)

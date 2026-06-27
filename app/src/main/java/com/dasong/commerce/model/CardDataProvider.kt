@@ -7,29 +7,29 @@ object CardDataProvider {
     // ===== 菜单牌 76张 =====
     val menuCards: List<MenuCard> = buildList {
         // 四品 (免费小吃) - 28张
-        addAll((1..7).map { MenuCard(400 + it, "炊饼", MenuGrade.FOUR, 0) })
-        addAll((1..7).map { MenuCard(410 + it, "馒头", MenuGrade.FOUR, 0) })
-        addAll((1..7).map { MenuCard(420 + it, "馄饨", MenuGrade.FOUR, 0) })
-        addAll((1..7).map { MenuCard(430 + it, "汤面", MenuGrade.FOUR, 0) })
+        addAll((1..7).map { MenuCard(400 + it, "炊饼", MenuGrade.FOUR, 0, emoji = "🫓") })
+        addAll((1..7).map { MenuCard(410 + it, "月饼", MenuGrade.FOUR, 0, emoji = "🥮") })
+        addAll((1..7).map { MenuCard(420 + it, "饺子", MenuGrade.FOUR, 0, emoji = "🥟") })
+        addAll((1..7).map { MenuCard(430 + it, "汤面", MenuGrade.FOUR, 0, emoji = "🍜") })
 
         // 三品 (家常菜) - 25张
-        addAll((1..5).map { MenuCard(500 + it, "炒青菜", MenuGrade.THREE, 3) })
-        addAll((1..5).map { MenuCard(510 + it, "葱油鸡", MenuGrade.THREE, 3) })
-        addAll((1..5).map { MenuCard(520 + it, "红烧鱼", MenuGrade.THREE, 3) })
-        addAll((1..5).map { MenuCard(530 + it, "豆腐羹", MenuGrade.THREE, 3) })
-        addAll((1..5).map { MenuCard(540 + it, "酱牛肉", MenuGrade.THREE, 3) })
+        addAll((1..5).map { MenuCard(500 + it, "炒青菜", MenuGrade.THREE, 3, emoji = "🥬") })
+        addAll((1..5).map { MenuCard(510 + it, "葱油鸡", MenuGrade.THREE, 3, emoji = "🍗") })
+        addAll((1..5).map { MenuCard(520 + it, "红烧鱼", MenuGrade.THREE, 3, emoji = "🐟") })
+        addAll((1..5).map { MenuCard(530 + it, "豆腐羹", MenuGrade.THREE, 3, emoji = "🥣") })
+        addAll((1..5).map { MenuCard(540 + it, "酱牛肉", MenuGrade.THREE, 3, emoji = "🥩") })
 
         // 二品 (硬菜) - 19张
-        addAll((1..5).map { MenuCard(600 + it, "葱爆羊肉", MenuGrade.TWO, 6) })
-        addAll((1..5).map { MenuCard(610 + it, "糖醋里脊", MenuGrade.TWO, 6) })
-        addAll((1..5).map { MenuCard(620 + it, "红烧狮子头", MenuGrade.TWO, 6) })
-        addAll((1..4).map { MenuCard(630 + it, "松鼠鳜鱼", MenuGrade.TWO, 6) })
+        addAll((1..5).map { MenuCard(600 + it, "葱爆羊肉", MenuGrade.TWO, 6, emoji = "🍖") })
+        addAll((1..5).map { MenuCard(610 + it, "椰子鸡", MenuGrade.TWO, 6, emoji = "🐔") })
+        addAll((1..5).map { MenuCard(620 + it, "北京烤鸭", MenuGrade.TWO, 6, emoji = "🦆") })
+        addAll((1..4).map { MenuCard(630 + it, "松鼠鳜鱼", MenuGrade.TWO, 6, emoji = "🐠") })
 
         // 一品 (御宴) - 4张
-        addAll((1..1).map { MenuCard(700 + it, "东坡肉", MenuGrade.ONE, 9) })
-        addAll((1..1).map { MenuCard(701, "御膳坊", MenuGrade.ONE, 9) })
-        addAll((1..1).map { MenuCard(702, "蟹酿橙", MenuGrade.ONE, 9) })
-        addAll((1..1).map { MenuCard(703, "佛跳墙", MenuGrade.ONE, 9) })
+        addAll((1..1).map { MenuCard(700 + it, "火爆鱿鱼", MenuGrade.ONE, 9, emoji = "🦑") })
+        addAll((1..1).map { MenuCard(701, "金丝虾球", MenuGrade.ONE, 9, emoji = "🦐") })
+        addAll((1..1).map { MenuCard(702, "蟹酿橙", MenuGrade.ONE, 9, emoji = "🦀") })
+        addAll((1..1).map { MenuCard(703, "鱼翅捞饭", MenuGrade.ONE, 9, emoji = "🦈") })
     }
 
     // ===== 店铺牌 36张 (12种 × 3张) =====

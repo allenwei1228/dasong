@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 传统屋顶（庑殿顶） -->
+    <path
+        android:fillColor="#E8B730"
+        android:pathData="M32,36 Q36,20 54,12 Q72,20 76,36 Z" />
+
+    <!-- 屋顶飞檐翘角（左） -->
+    <path
+        android:fillColor="#D4A520"
+        android:pathData="M32,36 Q28,36 26,32 Q30,34 32,36 Z" />
+
+    <!-- 屋顶飞檐翘角（右） -->
+    <path
+        android:fillColor="#D4A520"
+        android:pathData="M76,36 Q80,36 82,32 Q78,34 76,36 Z" />
+
+    <!-- 铜钱外圆（外圆内方，宋代商业象征） -->
+    <path
+        android:fillColor="#E8B730"
+        android:pathData="M54,36 C67.46,36 78,46.54 78,60 C78,73.46 67.46,84 54,84 C40.54,84 30,73.46 30,60 C30,46.54 40.54,36 54,36 Z M45,54 L63,54 L63,66 L45,66 Z"
+        android:fillType="evenOdd" />
+
+    <!-- 铜钱外缘描边 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C49B20"
+        android:strokeWidth="1.5"
+        android:pathData="M54,36 C67.46,36 78,46.54 78,60 C78,73.46 67.46,84 54,84 C40.54,84 30,73.46 30,60 C30,46.54 40.54,36 54,36 Z" />
+
+    <!-- 方孔四角装饰点（铜钱经典元素） -->
+    <path android:fillColor="#C49B20" android:pathData="M46.5,54 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <path android:fillColor="#C49B20" android:pathData="M61.5,54 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <path android:fillColor="#C49B20" android:pathData="M46.5,66 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <path android:fillColor="#C49B20" android:pathData="M61.5,66 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+
+    <!-- 底部"商"字形简化 -->
+    <path
+        android:fillColor="#E8B730"
+        android:pathData="M52,88 L56,88 L56,100 L52,100 Z" />
+
+    <!-- 底部横梁 -->
+    <path
+        android:fillColor="#E8B730"
+        android:pathData="M47,88 L61,88 L61,90 L47,90 Z" />
+
+</vector>

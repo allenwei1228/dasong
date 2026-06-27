@@ -5,8 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,17 +63,17 @@ fun FoundationSlots(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (foundation.shopCard != null) {
                                 Text(
-                                    foundation.shopCard!!.name.take(2),
-                                    style = MaterialTheme.typography.labelSmall,
+                                    foundation.shopCard!!.name,
+                                    style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1
+                                    maxLines = 2
                                 )
                                 if (foundation.isBuilt) {
-                                    Icon(
-                                        Icons.Default.Home,
-                                        contentDescription = "已建",
-                                        modifier = Modifier.size(14.dp),
-                                        tint = Color.White
+                                    Text(
+                                        foundation.shopCard!!.type.emoji,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1
                                     )
                                 }
                             } else {

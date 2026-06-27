@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,9 +8,27 @@ plugins {
     kotlin("kapt")
 }
 
+// 读取签名配置
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+
 android {
     namespace = "com.dasong.commerce"
     compileSdk = 34
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.dasong.commerce"
@@ -22,9 +42,9 @@ android {
             useSupportLibrary = true
         }
 
-        // Supabase 配置（请替换为你的实际 URL 和 Key）
-        buildConfigField("String", "SUPABASE_URL", "\"https://your-project.supabase.co\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"your-anon-key\"")
+        // Supabase 配置（从 gradle.properties 读取）
+        buildConfigField("String", "SUPABASE_URL", "\"${project.findProperty("SUPABASE_URL") ?: "https://your-project.supabase.co"}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${project.findProperty("SUPABASE_ANON_KEY") ?: "your-anon-key"}\"")
     }
 
     buildTypes {
@@ -34,6 +54,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

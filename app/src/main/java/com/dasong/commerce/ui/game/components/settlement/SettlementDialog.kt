@@ -46,7 +46,7 @@ fun SettlementDialog(
                 // Show menu cards with income values
                 if (data.menuCards.isNotEmpty()) {
                     Text(
-                        "菜单牌: ${data.menuCards.joinToString(", ") { "${it.name}(${it.baseIncome}两)" }}",
+                        "菜单牌: ${data.menuCards.joinToString(", ") { "${it.displayName}(${it.baseIncome}两)" }}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )

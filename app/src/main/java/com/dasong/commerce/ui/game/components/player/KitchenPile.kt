@@ -74,7 +74,7 @@ fun KitchenPile(cards: List<MenuCard>) {
                         .padding(2.dp)
                 ) {
                     Text(
-                        "${card.cardGrade(card.grade)}·${card.name}",
+                        "${card.cardGrade(card.grade)}·${card.displayName}",
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1
                     )
@@ -124,7 +124,7 @@ fun KitchenPile(cards: List<MenuCard>) {
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    "#${index + 1} ${card.cardGrade(card.grade)}·${card.name}",
+                                    "#${index + 1} ${card.cardGrade(card.grade)}·${card.displayName}",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(

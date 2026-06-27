@@ -6,19 +6,19 @@ import kotlinx.serialization.Serializable
 enum class MenuGrade { ONE, TWO, THREE, FOUR }
 
 @Serializable
-enum class ShopType(val displayName: String) {
-    GUA_SI("卦肆"),
-    SHU_FANG("书坊"),
-    JIU_SI("酒肆"),
-    CHOU_DUAN("绸缎庄"),
-    GOU_LAN("勾栏瓦肆"),
-    CI_QI("瓷器铺"),
-    CU_JU("蹴鞠场"),
-    YIN_ZI("饮子铺"),
-    GUAN_PU("关扑铺"),
-    CHA_GUAN("茶馆"),
-    SHUO_SHU("说书场"),
-    SHOU_SHI("首饰铺")
+enum class ShopType(val displayName: String, val emoji: String) {
+    GUAN_PU("关扑铺", "💿"),
+    GUA_SI("卦肆", "☯️"),
+    CU_JU("蹴鞠场", "⚽️"),
+    SHU_FANG("书坊", "📖"),
+    JIU_SI("酒肆", "🍾"),
+    CHOU_DUAN("绸缎庄", "🧵"),
+    GOU_LAN("勾栏瓦肆", "🪕"),
+    CI_QI("瓷器铺", "🏺"),
+    YIN_ZI("饮子铺", "🍵"),
+    SHUO_SHU("说书场", "🪭"),
+    SHOU_SHI("首饰铺", "💍"),
+    CHA_GUAN("茶馆", "🫖")
 }
 
 @Serializable
