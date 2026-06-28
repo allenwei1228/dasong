@@ -86,6 +86,16 @@ class OnlineViewModel @Inject constructor() : ViewModel() {
                     isLoading = false,
                     currentRoom = room,
                 )
+
+                // 重连到进行中的游戏：直接导航到游戏界面
+                if (room.status == RoomStatus.PLAYING) {
+                    val names = room.playerIds.map { id ->
+                        room.playerNames[id] ?: "玩家${room.playerIds.indexOf(id) + 1}"
+                    }
+                    _playerNames.value = names
+                    _playerCount.value = room.playerIds.size
+                    _shouldNavigateToGame.value = true
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -117,6 +127,16 @@ class OnlineViewModel @Inject constructor() : ViewModel() {
 
     fun leaveRoom() {
         OnlineManager.leaveRoom()
+        _uiState.value = OnlineUiState()
+        _shouldNavigateToGame.value = false
+        _playerNames.value = emptyList()
+    }
+
+    /**
+     * 游戏中断开连接（保留 playerId 以便重连）。
+     */
+    fun disconnect() {
+        OnlineManager.disconnectFromRoom()
         _uiState.value = OnlineUiState()
         _shouldNavigateToGame.value = false
         _playerNames.value = emptyList()

@@ -8,6 +8,7 @@ import com.dasong.commerce.model.card.*
 import com.dasong.commerce.online.OnlineManager
 import com.dasong.commerce.online.RoomStatus
 import com.dasong.commerce.util.DiceRoller
+import com.dasong.commerce.util.LogUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -78,6 +79,26 @@ class GameViewModel @Inject constructor(
     /** 标记是否是自己主动退出的（避免自己也弹出解散提示） */
     private var _isExitingSelf = false
 
+    /** 游戏开始通知弹窗：提示玩家序号和初始资金 */
+    private val _showGameStartNotification = MutableStateFlow(false)
+    val showGameStartNotification: StateFlow<Boolean> = _showGameStartNotification.asStateFlow()
+
+    private val _gameStartInfo = MutableStateFlow<GameStartInfo?>(null)
+    val gameStartInfo: StateFlow<GameStartInfo?> = _gameStartInfo.asStateFlow()
+
+    /** 是否已展示过游戏开始通知 */
+    private var _hasShownGameStart = false
+
+    /** 重连摘要弹窗 */
+    private val _showReconnectSummary = MutableStateFlow(false)
+    val showReconnectSummary: StateFlow<Boolean> = _showReconnectSummary.asStateFlow()
+
+    private val _reconnectSummaryHistory = MutableStateFlow<List<String>>(emptyList())
+    val reconnectSummaryHistory: StateFlow<List<String>> = _reconnectSummaryHistory.asStateFlow()
+
+    /** 是否为重连模式 */
+    private var _isReconnecting = false
+
     fun initGame(playerCount: Int, playerNames: List<String> = emptyList()) {
         viewModelScope.launch {
             // 检测是否为联机模式
@@ -86,34 +107,85 @@ class GameViewModel @Inject constructor(
             _isOnlineMode.value = online
 
             if (online) {
-                // 联机模式：从房间数据获取玩家名称
-                val names = if (playerNames.isNotEmpty()) {
-                    playerNames
-                } else if (room != null) {
-                    room.playerIds.map { id ->
-                        room.playerNames[id] ?: "玩家${room.playerIds.indexOf(id) + 1}"
-                    }
+                // 重连判定：优先使用 OnlineManager 的确定性标记（joinRoom 时已知），
+                // 避免依赖 syncedState 的竞态条件（sync 可能尚未拉取到服务端状态）
+                val justReconnected = OnlineManager.consumeReconnectFlag()
+                val syncedState = OnlineManager.syncedGameState.value
+                val isReconnection = justReconnected ||
+                        (room != null &&
+                        OnlineManager.playerId.value in room.playerIds &&
+                        gameEngine.gameState.value == null &&
+                        syncedState != null &&
+                        syncedState.stateVersion > 1)
+
+                if (isReconnection) {
+                    // 重连模式：不从零初始化，等待 sync 拉取服务端状态
+                    LogUtil.d("GameViewModel", "重连模式：等待同步服务端游戏状态...")
+                    _hasShownGameStart = true // 重连不弹开始通知
+                    _isReconnecting = true
+                    startOnlineSync()
                 } else {
-                    emptyList()
-                }
-                gameEngine.initGame(playerCount, names)
+                    // 正常联机初始化
+                    val names = if (playerNames.isNotEmpty()) {
+                        playerNames
+                    } else if (room != null) {
+                        room.playerIds.map { id ->
+                            room.playerNames[id] ?: "玩家${room.playerIds.indexOf(id) + 1}"
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    gameEngine.initGame(playerCount, names)
 
-                // 房主发布初始游戏状态到服务器
-                if (room?.ownerId == OnlineManager.playerId.value) {
-                    val state = gameEngine.gameState.value ?: return@launch
-                    OnlineManager.publishInitialGameState(state)
-                }
+                    // 房主发布初始游戏状态到服务器
+                    val isHost = room?.ownerId == OnlineManager.playerId.value
+                    if (isHost) {
+                        val state = gameEngine.gameState.value ?: return@launch
+                        OnlineManager.publishInitialGameState(state)
+                        // 房主本地立即弹窗通知
+                        triggerGameStartNotification()
+                    }
 
-                // 启动联机同步监听
-                startOnlineSync()
+                    // 启动联机同步监听
+                    startOnlineSync()
+                }
             } else {
                 // 单机模式：正常初始化
                 gameEngine.initGame(playerCount, playerNames)
+                // 单机热座模式：弹窗通知第一位玩家
+                triggerGameStartNotification()
             }
 
             // 更新回合归属
             updateMyTurnState()
         }
+    }
+
+    /**
+     * 弹出游戏开始通知：展示所有玩家的 seatOrder 分配和初始资金。
+     * 联机模式下每位玩家在自己的设备上看到相同的内容（由房主的 shuffle 决定）。
+     */
+    private fun triggerGameStartNotification() {
+        if (_hasShownGameStart) return
+        _hasShownGameStart = true
+
+        val state = gameEngine.gameState.value ?: return
+        if (state.players.isEmpty()) return
+
+        val assignments = state.players.sortedBy { it.seatOrder }.map { player ->
+            PlayerAssignment(
+                seatOrder = player.seatOrder,
+                name = player.name,
+                funds = player.funds
+            )
+        }
+        _gameStartInfo.value = GameStartInfo(players = assignments)
+        _showGameStartNotification.value = true
+    }
+
+    /** 关闭游戏开始通知弹窗 */
+    fun dismissGameStartNotification() {
+        _showGameStartNotification.value = false
     }
 
     /**
@@ -129,6 +201,17 @@ class GameViewModel @Inject constructor(
                 if (localState == null || remoteState.stateVersion > localState.stateVersion) {
                     gameEngine.applyRemoteState(remoteState)
                     updateMyTurnState()
+                    // 非房主玩家：首次收到房主发布的游戏状态后弹窗通知
+                    if (!_hasShownGameStart) {
+                        triggerGameStartNotification()
+                    }
+                    // 重连成功：展示离开期间的游戏摘要
+                    if (_isReconnecting && remoteState.turnHistory.isNotEmpty()) {
+                        _reconnectSummaryHistory.value = remoteState.turnHistory.toList()
+                        _showReconnectSummary.value = true
+                        _isReconnecting = false
+                        LogUtil.d("GameViewModel", "重连成功，展示离开期间摘要: ${remoteState.turnHistory.size} 条记录")
+                    }
                 }
             }
         }
@@ -171,7 +254,11 @@ class GameViewModel @Inject constructor(
         if (!_isOnlineMode.value) return
         val state = gameEngine.gameState.value ?: return
         viewModelScope.launch {
-            OnlineManager.publishGameState(state)
+            try {
+                OnlineManager.publishGameState(state)
+            } catch (e: Exception) {
+                LogUtil.e("GameViewModel", "游戏状态同步失败: ${e.message}")
+            }
         }
     }
 
@@ -399,21 +486,20 @@ class GameViewModel @Inject constructor(
         _showMyTurnReminder.value = false
     }
 
-    /** 退出游戏：联机模式下解散房间，单机模式直接退出 */
+    /** 退出游戏：单机模式直接退出到主页（联机模式退出在 GameScreen 层处理） */
     fun exitGame() {
-        viewModelScope.launch {
-            if (_isOnlineMode.value) {
-                _isExitingSelf = true
-                OnlineManager.disbandGame()
-            }
-            _shouldExitToHome.value = true
-        }
+        _shouldExitToHome.value = true
     }
 
     /** 关闭解散提示弹窗，导航回主页 */
     fun dismissDisbandMessage() {
         _disbandMessage.value = null
         _shouldExitToHome.value = true
+    }
+
+    /** 关闭重连摘要弹窗 */
+    fun dismissReconnectSummary() {
+        _showReconnectSummary.value = false
     }
 }
 
@@ -426,3 +512,16 @@ data class SettlementDisplayData(
     val shopActivations: List<ShopActivation>,
     val totalIncome: Int
 )
+
+/** 单个玩家的分配信息 */
+data class PlayerAssignment(
+    val seatOrder: Int,
+    val name: String,
+    val funds: Int
+)
+
+/** 游戏开始通知信息：包含所有玩家随机分配后的顺序和初始资金 */
+data class GameStartInfo(
+    val players: List<PlayerAssignment>
+)
+

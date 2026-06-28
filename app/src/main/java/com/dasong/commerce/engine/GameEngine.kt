@@ -56,7 +56,7 @@ class GameEngine(
                 refinedChamber = menuCards.toMutableList(),
                 kitchen = mutableListOf()
             )
-        }
+        }.shuffled()  // 随机打乱玩家列表顺序，使回合顺序真正随机
 
         val state = GameState(
             menuPool = menuPool,

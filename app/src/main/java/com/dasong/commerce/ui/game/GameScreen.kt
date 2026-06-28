@@ -1,14 +1,19 @@
 package com.dasong.commerce.ui.game
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,6 +29,8 @@ import com.dasong.commerce.engine.GameState
 import com.dasong.commerce.engine.WinConditionChecker
 import com.dasong.commerce.model.Foundation
 import com.dasong.commerce.model.card.ShopCard
+import com.dasong.commerce.online.OnlineViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +39,8 @@ fun GameScreen(
     playerNames: List<String> = emptyList(),
     onGameEnd: (String) -> Unit,
     onBackToHome: () -> Unit = {},
-    viewModel: GameViewModel = hiltViewModel()
+    viewModel: GameViewModel = hiltViewModel(),
+    onlineViewModel: OnlineViewModel = hiltViewModel()
 ) {
     val gameState by viewModel.gameState.collectAsStateWithLifecycle()
     val settlementResult by viewModel.settlementResult.collectAsStateWithLifecycle()
@@ -49,8 +57,13 @@ fun GameScreen(
     val diceSources by viewModel.diceSources.collectAsStateWithLifecycle()
     val shouldExitToHome by viewModel.shouldExitToHome.collectAsStateWithLifecycle()
     val disbandMessage by viewModel.disbandMessage.collectAsStateWithLifecycle()
+    val showGameStartNotification by viewModel.showGameStartNotification.collectAsStateWithLifecycle()
+    val gameStartInfo by viewModel.gameStartInfo.collectAsStateWithLifecycle()
+    val showReconnectSummary by viewModel.showReconnectSummary.collectAsStateWithLifecycle()
+    val reconnectSummaryHistory by viewModel.reconnectSummaryHistory.collectAsStateWithLifecycle()
 
     var showExitConfirm by remember { mutableStateOf(false) }
+    var reconnectTimeout by remember { mutableStateOf(false) }
 
     LaunchedEffect(playerCount) {
         viewModel.initGame(playerCount, playerNames)
@@ -66,17 +79,56 @@ fun GameScreen(
         }
     }
 
+    // 联机模式系统返回键：断开连接而非退出
+    if (isOnlineMode) {
+        BackHandler {
+            onlineViewModel.disconnect()
+            onGameEnd("") // 触发导航回到房间
+        }
+    }
+
+    // 重连等待：gameState 还未从服务器同步下来
+    if (gameState == null && isOnlineMode) {
+        // 超时检测：15 秒后显示重试选项
+        LaunchedEffect(Unit) {
+            delay(15_000)
+            if (gameState == null) {
+                reconnectTimeout = true
+            }
+        }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(16.dp))
+                Text("正在重新连接游戏...", style = MaterialTheme.typography.bodyLarge)
+                if (reconnectTimeout) {
+                    Spacer(Modifier.height(24.dp))
+                    Text(
+                        "连接超时，请检查网络后重试",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(onClick = {
+                        reconnectTimeout = false
+                        onGameEnd("")
+                    }) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("返回重新加入")
+                    }
+                }
+            }
+        }
+        return
+    }
+    
     val currentState = gameState ?: return
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    navigationIcon = {
-                        IconButton(onClick = { showExitConfirm = true }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                        }
-                    },
                     title = {
                         Column {
                             Text(
@@ -194,23 +246,31 @@ fun GameScreen(
                 )
             }
 
-            // 退出确认弹窗
-            if (showExitConfirm) {
-                ExitConfirmDialog(
-                    isOnlineMode = isOnlineMode,
-                    onConfirm = {
-                        showExitConfirm = false
-                        viewModel.exitGame()
-                    },
-                    onDismiss = { showExitConfirm = false }
-                )
-            }
 
             // 游戏解散提示弹窗（联机模式其他玩家退出时触发）
             disbandMessage?.let { message ->
                 GameDisbandedDialog(
                     message = message,
                     onConfirm = { viewModel.dismissDisbandMessage() }
+                )
+            }
+
+            // 游戏开始通知弹窗：告知玩家序号和初始资金
+            if (showGameStartNotification) {
+                gameStartInfo?.let { info ->
+                    GameStartNotificationDialog(
+                        info = info,
+                        onDismiss = { viewModel.dismissGameStartNotification() }
+                    )
+                }
+            }
+
+            // 重连摘要弹窗：离开期间的游戏进展
+            if (showReconnectSummary) {
+                ReconnectSummaryDialog(
+                    history = reconnectSummaryHistory,
+                    currentPlayerName = currentState.currentPlayer.name,
+                    onDismiss = { viewModel.dismissReconnectSummary() }
                 )
             }
         }
@@ -437,7 +497,7 @@ fun ExitConfirmDialog(
         text = {
             Text(
                 if (isOnlineMode)
-                    "确定要退出游戏吗？退出后本局游戏将解散，其他玩家也会被强制退出。"
+                    "确定要退出游戏吗？退出后其他玩家可以继续游戏，你可以通过房间号重新加入。"
                 else
                     "确定要退出游戏吗？游戏进度将不会保存。"
             )
@@ -478,6 +538,153 @@ fun GameDisbandedDialog(
         confirmButton = {
             Button(onClick = onConfirm) {
                 Text("返回主页")
+            }
+        }
+    )
+}
+
+/**
+ * 游戏开始通知弹窗：展示所有玩家的随机顺序分配和初始资金。
+ * 点击确认后进入游戏页面。
+ */
+@Composable
+fun GameStartNotificationDialog(
+    info: GameStartInfo,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = {
+            Text(
+                "🎮 游戏开始",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "玩家顺序随机分配结果：",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+
+                info.players.forEach { player ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "玩家${player.seatOrder}为${player.name}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "初始资金 ${player.funds}两",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "点击确认后进入游戏页面。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("开始游戏")
+            }
+        }
+    )
+}
+
+/**
+ * 重连摘要弹窗：展示玩家离开期间游戏发生了什么。
+ */
+@Composable
+fun ReconnectSummaryDialog(
+    history: List<String>,
+    currentPlayerName: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "🔗 重连成功",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "你离开期间，游戏发生了以下操作：",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+
+                if (history.isEmpty()) {
+                    Text(
+                        "暂无操作记录（游戏刚开始）。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    // 显示最近 10 条记录
+                    val recentHistory = history.takeLast(10)
+                    recentHistory.forEach { line ->
+                        Text(
+                            text = "· $line",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+                    if (history.size > 10) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "... 共 ${history.size} 条操作记录",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    "当前轮到：$currentPlayerName",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("继续游戏")
             }
         }
     )

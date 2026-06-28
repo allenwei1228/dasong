@@ -80,8 +80,15 @@ fun AppNavGraph() {
                 playerCount = playerCount,
                 playerNames = playerNames,
                 onGameEnd = { winnerName ->
-                    navController.navigate("result/$winnerName") {
-                        popUpTo("home") { inclusive = true }
+                    if (winnerName.isEmpty()) {
+                        // 断线/退出回到房间大厅
+                        navController.navigate("room") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate("result/$winnerName") {
+                            popUpTo("home") { inclusive = true }
+                        }
                     }
                 },
                 onBackToHome = {
@@ -101,8 +108,14 @@ fun AppNavGraph() {
                 playerCount = playerCount,
                 playerNames = emptyList(),
                 onGameEnd = { winnerName ->
-                    navController.navigate("result/$winnerName") {
-                        popUpTo("home") { inclusive = true }
+                    if (winnerName.isEmpty()) {
+                        navController.navigate("room") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate("result/$winnerName") {
+                            popUpTo("home") { inclusive = true }
+                        }
                     }
                 },
                 onBackToHome = {

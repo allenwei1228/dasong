@@ -1,7 +1,12 @@
 package com.dasong.commerce.online
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.dasong.commerce.BuildConfig
 import com.dasong.commerce.engine.GameState
+import com.dasong.commerce.model.card.GamePhase
+import com.dasong.commerce.model.card.TurnStep
+import com.dasong.commerce.util.LogUtil
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
@@ -30,12 +35,32 @@ object OnlineManager {
         SYNCING,
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // JSON 序列化器（忽略未知字段，兼容未来扩展）
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
+    }
+
+    // SharedPreferences 键名
+    private const val PREFS_NAME = "online_manager"
+    private const val KEY_PLAYER_ID = "player_id"
+
+    // 持久化存储（进程重启后恢复 playerId）
+    private var prefs: SharedPreferences? = null
+
+    /**
+     * 初始化 OnlineManager（在 Application.onCreate 中调用）。
+     * 从 SharedPreferences 恢复 playerId，确保进程重启后可重连。
+     */
+    fun init(context: Context) {
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedId = prefs?.getString(KEY_PLAYER_ID, null)
+        if (!savedId.isNullOrBlank()) {
+            _playerId.value = savedId
+            LogUtil.d("OnlineManager", "从本地恢复 playerId: ${savedId.take(8)}...")
+        }
     }
 
     // Supabase 客户端（懒初始化）
@@ -72,6 +97,16 @@ object OnlineManager {
     /** 本地上次推送的版本号，用于避免自己推送的状态触发重复刷新 */
     private var lastPublishedVersion: Long = -1
 
+    /** 标记最近一次 joinRoom 是否为重连（由 GameViewModel 消费后重置） */
+    private var _justReconnected = false
+
+    /** 消费重连标记（一次性读取后重置） */
+    fun consumeReconnectFlag(): Boolean {
+        val result = _justReconnected
+        _justReconnected = false
+        return result
+    }
+
     /** 发布锁：防止多个协程并发推送到 Supabase 导致旧状态覆盖新状态 */
     private val publishMutex = Mutex()
 
@@ -86,13 +121,15 @@ object OnlineManager {
 
     /**
      * 判断当前是否轮到本地玩家操作。
-     * 通过比较 GameState.currentPlayerIndex 对应的玩家 seatOrder 与本地玩家的 seatOrder。
+     * 通过比较 GameState 中当前玩家的名字与本地玩家名字来识别回合归属。
+     * 注意：不能依赖 seatOrder 比较，因为 GameEngine.initGame() 中 seatOrder 已被随机分配给不同名字。
      */
     fun isMyTurn(gameState: GameState?): Boolean {
         val state = gameState ?: return false
         if (state.players.isEmpty()) return false
-        val currentPlayerSeatOrder = state.players[state.currentPlayerIndex].seatOrder
-        return currentPlayerSeatOrder == getMySeatOrder()
+        val currentPlayer = state.players[state.currentPlayerIndex]
+        val myName = _playerName.value
+        return currentPlayer.name == myName
     }
 
     // ============ 连接与认证 ============
@@ -101,6 +138,9 @@ object OnlineManager {
         _playerName.value = displayName.ifBlank { "玩家" }
         if (_playerId.value.isBlank()) {
             _playerId.value = generatePlayerId()
+            // 持久化 playerId，确保进程重启后可恢复
+            prefs?.edit()?.putString(KEY_PLAYER_ID, _playerId.value)?.apply()
+            LogUtil.d("OnlineManager", "生成并持久化 playerId: ${_playerId.value.take(8)}...")
         }
         _connectionState.value = ConnectionStatus.CONNECTED
         _events.tryEmit("已连接为 ${_playerName.value}")
@@ -155,9 +195,16 @@ object OnlineManager {
         require(!room.isFull || _playerId.value in room.playerIds) { "房间已满" }
         require(room.status != RoomStatus.PLAYING || _playerId.value in room.playerIds) { "游戏已开始，无法加入" }
 
+        val isReconnecting = _playerId.value in room.playerIds
+
         // 如果已在房间中更新昵称，否则加入房间
-        val joinedRoom = if (_playerId.value in room.playerIds) {
-            room.copy(playerNames = room.playerNames + (_playerId.value to _playerName.value))
+        val joinedRoom = if (isReconnecting) {
+            // 重连：从断开列表中移除自己
+            val newDisconnected = room.disconnectedPlayerIds - _playerId.value
+            room.copy(
+                playerNames = room.playerNames + (_playerId.value to _playerName.value),
+                disconnectedPlayerIds = newDisconnected,
+            )
         } else {
             room.copy(
                 playerIds = room.playerIds + _playerId.value,
@@ -165,16 +212,23 @@ object OnlineManager {
             )
         }
 
-        // 更新 Supabase
+        // 更新 Supabase（区分重连和新加入）
         supabase.from("rooms").update({
             set("player_ids", joinedRoom.playerIds)
             set("player_names", joinedRoom.playerNames)
+            if (isReconnecting) {
+                set("disconnected_player_ids", joinedRoom.disconnectedPlayerIds)
+            }
         }) {
             filter { eq("room_code", normalizedCode) }
         }
 
         _roomFlow.value = joinedRoom
         startSync(joinedRoom.roomCode)
+        if (isReconnecting && room.status == RoomStatus.PLAYING) {
+            _justReconnected = true
+            _events.tryEmit("已重新连接游戏")
+        }
         return joinedRoom
     }
 
@@ -226,6 +280,37 @@ object OnlineManager {
         lastPublishedVersion = -1
     }
 
+    /**
+     * 游戏中断开连接（保留 playerId 以便后续重连）。
+     * 在 Supabase 上标记当前玩家为已断开，其他客户端会自动跳过该玩家的回合。
+     */
+    fun disconnectFromRoom() {
+        val room = _roomFlow.value ?: return
+        val myId = _playerId.value
+        if (myId.isBlank()) return
+
+        // 标记自己为已断开
+        val updatedDisconnected = (room.disconnectedPlayerIds + myId).distinct()
+        _roomFlow.value = room.copy(disconnectedPlayerIds = updatedDisconnected)
+
+        // 异步通知服务器
+        scope.launch {
+            runCatching {
+                supabase.from("rooms").update({
+                    set("disconnected_player_ids", updatedDisconnected)
+                }) {
+                    filter { eq("room_code", room.roomCode) }
+                }
+            }
+        }
+
+        syncJob?.cancel()
+        syncJob = null
+        _connectionState.value = ConnectionStatus.DISCONNECTED
+        _syncedGameState.value = null
+        _events.tryEmit("已断开连接，可重新加入游戏")
+    }
+
     suspend fun addLocalPlayer(playerName: String) {
         val room = _roomFlow.value ?: error("当前未加入任何房间")
         require(room.ownerId == _playerId.value) { "只有房主可以添加玩家" }
@@ -252,9 +337,12 @@ object OnlineManager {
 
     /**
      * 房主发布初始游戏状态到 Supabase。
+     * 将 stateVersion 设为 1，确保高于所有客户端的默认值 (0)，
+     * 这样非房主玩家通过 sync 轮询时能正确应用房主状态。
      */
     suspend fun publishInitialGameState(gameState: GameState) {
         publishMutex.withLock {
+            gameState.stateVersion = 1
             doPublishGameState(gameState)
         }
     }
@@ -313,6 +401,7 @@ object OnlineManager {
     /**
      * 每秒轮询 Supabase 获取房间状态和游戏状态。
      * 游戏状态同步：当 version > 本地已处理版本时，推送给 UI。
+     * 自动跳过：检测到当前回合玩家已断开时，自动推进回合。
      */
     private fun startSync(roomCode: String) {
         syncJob?.cancel()
@@ -336,6 +425,12 @@ object OnlineManager {
                         _syncedGameState.value = gameStateDto.state
                         lastPublishedVersion = gameStateDto.version
                     }
+
+                    // 自动跳过断开玩家的回合（仅本客户端已连接时执行）
+                    if (room != null && gameStateDto != null && _playerId.value !in room.disconnectedPlayerIds) {
+                        autoSkipDisconnectedPlayerIfNeeded(room, gameStateDto)
+                    }
+
                     _connectionState.value = ConnectionStatus.CONNECTED
                 }.onFailure {
                     _connectionState.value = ConnectionStatus.CONNECTED
@@ -343,6 +438,51 @@ object OnlineManager {
                 }
                 delay(1_000) // 每秒同步一次
             }
+        }
+    }
+
+    /**
+     * 如果当前回合玩家已断开连接且本客户端是已连接的玩家，自动跳过该回合。
+     */
+    private suspend fun autoSkipDisconnectedPlayerIfNeeded(room: RoomData, gameStateDto: GameStateDto) {
+        val gameState = gameStateDto.state
+        if (gameState.players.isEmpty()) return
+
+        // 通过玩家名字找到对应的 playerId（因为 seatOrder 已被随机分配，不能再用 seatOrder 映射到 playerIds）
+        val currentPlayerName = gameState.currentPlayer.name
+        val currentPlayerId = room.playerNames.entries.find { it.value == currentPlayerName }?.key ?: return
+
+        // 当前玩家未断开，无需跳过
+        if (currentPlayerId !in room.disconnectedPlayerIds) return
+
+        // 所有玩家都断开了（所有人退出），不跳过
+        val hasConnectedPlayer = room.playerIds.any { it !in room.disconnectedPlayerIds }
+        if (!hasConnectedPlayer) return
+
+        // 跳过此玩家：推进到下一个玩家
+        val newState = gameState.copy()
+        newState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.size
+        newState.currentPhase = GamePhase.BUY
+        newState.turnStep = TurnStep.PHASE_1_BUY_MENU_OR_SHOP
+        newState.settlementTip = 0
+        newState.settlementMenuIncome = 0
+        newState.settlementShopIncome = 0
+        newState.menuBoughtThisTurn = false
+        newState.shopPlacedThisTurn = false
+        newState.stateVersion = gameState.stateVersion + 1
+
+        LogUtil.d("OnlineManager", "自动跳过断开玩家: ${gameState.currentPlayer.name} -> ${newState.currentPlayer.name}")
+
+        // 临时设置 roomFlow 用于 publishGameState
+        val savedRoom = _roomFlow.value
+        _roomFlow.value = room
+        try {
+            publishGameState(newState)
+            _events.tryEmit("${gameState.currentPlayer.name} 已断开，自动跳过回合")
+        } catch (_: Exception) {
+            // 其他客户端可能已经跳过了，忽略
+        } finally {
+            _roomFlow.value = savedRoom
         }
     }
 }

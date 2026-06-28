@@ -22,6 +22,8 @@ data class RoomDto(
     val status: String = "WAITING",
     @SerialName("created_at")
     val createdAt: String? = null,
+    @SerialName("disconnected_player_ids")
+    val disconnectedPlayerIds: List<String> = emptyList(),
 ) {
     fun toRoomData(): RoomData = RoomData(
         roomCode = roomCode,
@@ -30,6 +32,7 @@ data class RoomDto(
         playerNames = playerNames,
         maxPlayers = maxPlayers,
         status = try { RoomStatus.valueOf(status) } catch (_: Exception) { RoomStatus.WAITING },
+        disconnectedPlayerIds = disconnectedPlayerIds,
     )
 
     companion object {
@@ -40,6 +43,7 @@ data class RoomDto(
             playerNames = room.playerNames,
             maxPlayers = room.maxPlayers,
             status = room.status.name,
+            disconnectedPlayerIds = room.disconnectedPlayerIds,
         )
     }
 }

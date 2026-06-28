@@ -8,6 +8,7 @@ data class RoomData(
     val maxPlayers: Int = 2,            // 最大人数 (2-4)
     val status: RoomStatus = RoomStatus.WAITING,
     val createdAt: Long = System.currentTimeMillis(),
+    val disconnectedPlayerIds: List<String> = emptyList(), // 已断开连接的玩家ID列表
 ) {
     val isFull: Boolean get() = playerIds.size >= maxPlayers
     val playerCount: Int get() = playerIds.size
