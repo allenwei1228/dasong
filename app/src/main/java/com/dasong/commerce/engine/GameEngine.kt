@@ -40,7 +40,8 @@ class GameEngine(
         }
 
         // Create players with randomly assigned seat orders
-        // 玩家顺序随机抽取：打乱名字索引，使 seatOrder 随机分配给各玩家
+        // 玩家序号随机抽取：打乱名字索引，使 seatOrder 随机分配给各玩家
+        // 行动顺序按 seatOrder 固定排列：玩家1(5铜钱) → 玩家2(6铜钱) → 玩家3(7铜钱) → 玩家4(8铜钱)
         val names = if (playerNames.size == playerCount) playerNames else emptyList()
         val nameIndices = (0 until playerCount).toMutableList()
         nameIndices.shuffle()
@@ -56,7 +57,7 @@ class GameEngine(
                 refinedChamber = menuCards.toMutableList(),
                 kitchen = mutableListOf()
             )
-        }.shuffled()  // 随机打乱玩家列表顺序，使回合顺序真正随机
+        }.sortedBy { it.seatOrder }  // 按seatOrder排序：玩家1先行动，玩家4最后
 
         val state = GameState(
             menuPool = menuPool,

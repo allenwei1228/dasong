@@ -27,16 +27,15 @@ fun PublicAreaPanel(state: GameState) {
         )
         Spacer(Modifier.height(8.dp))
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .horizontalScroll(rememberScrollState())
         ) {
             GuestQueue(guestQueue = state.guestQueue)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(2.dp))
             ShopCardPool(shopPool = state.shopPool)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(2.dp))
             MenuCardPool(state.menuPool)
         }
     }

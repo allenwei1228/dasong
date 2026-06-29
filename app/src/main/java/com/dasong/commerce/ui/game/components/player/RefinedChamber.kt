@@ -28,21 +28,6 @@ fun RefinedChamber(cards: List<MenuCard>) {
             .padding(8.dp)
             .width(100.dp)
     ) {
-        Text("雅阁", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-        Text("手牌库", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-        Spacer(Modifier.height(4.dp))
-        // Show as card backs (stacked)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp)
-                .background(
-                    SongTeal.copy(alpha = 0.3f),
-                    RoundedCornerShape(4.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("${cards.size}张", fontWeight = FontWeight.Bold)
-        }
+        Text("雅阁：${cards.size}张", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
     }
 }

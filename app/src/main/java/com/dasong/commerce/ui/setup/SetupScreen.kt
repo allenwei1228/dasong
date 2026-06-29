@@ -132,12 +132,16 @@ fun SetupScreen(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("💰 初始资金分配", fontWeight = FontWeight.Bold)
+                    Text("💰 初始资金与行动顺序", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
+                    Text(
+                        "玩家序号随机分配，行动顺序固定如下：",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     (1..selectedPlayerCount).forEach { i ->
                         val funds = when (i) { 1 -> 5; 2 -> 6; 3 -> 7; 4 -> 8; else -> 5 }
                         Text(
-                            "顺位 $i (玩家$i): $funds 两",
+                            "玩家$i: $funds 两 (${if (i == 1) "先手" else "第${i}位行动"})",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

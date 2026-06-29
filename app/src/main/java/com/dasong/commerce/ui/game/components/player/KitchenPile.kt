@@ -38,57 +38,7 @@ fun KitchenPile(cards: List<MenuCard>) {
             .padding(8.dp)
             .width(100.dp)
     ) {
-        Text("后厨", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-        Text("弃牌堆", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-        Spacer(Modifier.height(4.dp))
-
-        // Show top 3 cards face up
-        val displayCards = cards.takeLast(3)
-        if (displayCards.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .background(
-                        SongBrown.copy(alpha = 0.2f),
-                        RoundedCornerShape(4.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("空", style = MaterialTheme.typography.labelSmall)
-            }
-        } else {
-            displayCards.forEach { card ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            when (card.grade) {
-                                MenuGrade.ONE -> Color(0xFFDAA520).copy(alpha = 0.3f)
-                                MenuGrade.TWO -> Color(0xFFC0C0C0).copy(alpha = 0.3f)
-                                MenuGrade.THREE -> Color(0xFFCD853F).copy(alpha = 0.3f)
-                                MenuGrade.FOUR -> Color(0xFF8B7355).copy(alpha = 0.3f)
-                            },
-                            RoundedCornerShape(4.dp)
-                        )
-                        .padding(2.dp)
-                ) {
-                    Text(
-                        "${card.cardGrade(card.grade)}·${card.displayName}",
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1
-                    )
-                }
-                Spacer(Modifier.height(2.dp))
-            }
-            if (cards.size > 3) {
-                Text(
-                    "还有${cards.size - 3}张...",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray
-                )
-            }
-        }
+        Text("后厨${cards.size}张", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
     }
 
     // Dialog showing all discarded cards

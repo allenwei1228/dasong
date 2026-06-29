@@ -64,11 +64,6 @@ private fun GuestCardView(
             style = MaterialTheme.typography.labelSmall
         )
         Text(
-            if (cost > 0) "小费${cost}两" else "免费",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
-        )
-        Text(
             guest.shopTypes.joinToString("\n") { it.displayName },
             style = MaterialTheme.typography.labelSmall,
             maxLines = 5
